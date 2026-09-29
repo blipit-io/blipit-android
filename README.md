@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("io.blipit:blipit-android:0.1.0")
+implementation("com.github.blipit-io:blipit-android:v0.1.1")
 ```
 
 ## Quick start

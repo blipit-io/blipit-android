@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("com.github.blipit-io:blipit-android:v0.1.2")
+implementation("com.github.blipit-io:blipit-android:v0.2.0")
 ```
 
 ## Quick start
@@ -51,6 +51,17 @@ Blipit.addBreadcrumb("opened checkout", category = "ui")
 Blipit.captureSecurity("login_failed", "ana@example.com", ip = "10.0.0.1")
 Blipit.flush()
 ```
+
+## Bug reports
+
+Show the floating Report a bug button on every screen, or open the reporter from your own menu:
+
+```kotlin
+Blipit.showReportButton()
+Blipit.showReport()
+```
+
+The reporter asks first: Take a screenshot or Skip. The screenshot opens full screen with the tools above and below it; pinch or double-tap to zoom, mark the problem, then add a title and what happened and send. Reports arrive under Bug reports at app.blipit.io. Screen recording is not offered on Android, because it needs a foreground service that Google Play asks every app to declare and justify.
 
 ## Performance
 

@@ -1,7 +1,12 @@
 package io.blipit.android
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
 import io.sentry.Breadcrumb
+import io.sentry.EventProcessor
+import io.sentry.Hint
+import io.sentry.SentryEvent
 import io.sentry.Sentry
 import io.sentry.SentryLevel
 import io.sentry.SentryOptions
@@ -22,6 +27,22 @@ class BlipitOptions {
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
+    const val VERSION = "0.2.0"
+    const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
+
+    @Volatile
+    internal var reporter: ReportClient? = null
+
+    internal val identity = object : EventProcessor {
+        override fun process(event: SentryEvent, hint: Hint): SentryEvent {
+            try {
+                val sdk = event.sdk
+                if (sdk != null && sdk.packageSet.none { it.name == PACKAGE_NAME }) sdk.addPackage(PACKAGE_NAME, VERSION)
+            } catch (_: RuntimeException) {
+            }
+            return event
+        }
+    }
 
     @JvmStatic
     @JvmOverloads
@@ -39,6 +60,7 @@ object Blipit {
             apply(sentry, options)
             options.configure?.invoke(sentry)
         }
+        Reporter.attach(context.applicationContext as? Application)
     }
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
@@ -52,7 +74,20 @@ object Blipit {
         sentry.release = options.release
         sentry.tracesSampleRate = options.tracesSampleRate
         sentry.isSendDefaultPii = false
+        sentry.addEventProcessor(identity)
+        reporter = ReportClient(options.endpoint, options.key)
     }
+
+    @JvmStatic
+    @JvmOverloads
+    fun showReport(activity: Activity? = null) = Reporter.show(activity)
+
+    @JvmStatic
+    @JvmOverloads
+    fun showReportButton(activity: Activity? = null) = Reporter.showButton(activity)
+
+    @JvmStatic
+    fun hideReportButton() = Reporter.hideButton()
 
     @JvmStatic
     fun captureException(throwable: Throwable): SentryId = Sentry.captureException(throwable)

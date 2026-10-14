@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.blipit"
-version = "0.1.0"
+version = "0.2.0"
 
 android {
     namespace = "io.blipit.android"
@@ -15,8 +15,12 @@ android {
 
     defaultConfig {
         minSdk = 21
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testOptions {
+        targetSdk = 35
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -38,6 +42,9 @@ kotlin {
 dependencies {
     api("io.sentry:sentry-android:8.58.0")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
 
 publishing {
@@ -45,7 +52,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "io.blipit"
             artifactId = "blipit-android"
-            version = "0.1.0"
+            version = "0.2.0"
             afterEvaluate {
                 from(components["release"])
             }

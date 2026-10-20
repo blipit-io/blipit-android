@@ -22,12 +22,14 @@ class BlipitOptions {
     var release: String? = null
     var tracesSampleRate: Double = 0.0
     var endpoint: String = Blipit.DEFAULT_ENDPOINT
+    var childDirected: Boolean = false
+    var replayLabels: Boolean = false
     var configure: ((SentryAndroidOptions) -> Unit)? = null
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.2.0"
+    const val VERSION = "0.3.0"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
     @Volatile
@@ -58,9 +60,12 @@ object Blipit {
         require(options.project.isNotEmpty()) { "Blipit.init needs the project id" }
         SentryAndroid.init(context) { sentry ->
             apply(sentry, options)
+            Replay.setup(context, sentry, options)
             options.configure?.invoke(sentry)
         }
-        Reporter.attach(context.applicationContext as? Application)
+        val app = context.applicationContext as? Application
+        Reporter.attach(app)
+        Replay.start(app)
     }
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
@@ -88,6 +93,15 @@ object Blipit {
 
     @JvmStatic
     fun hideReportButton() = Reporter.hideButton()
+
+    @JvmStatic
+    fun setReplayConsent(granted: Boolean) = Replay.setConsent(granted)
+
+    @JvmStatic
+    fun hasReplayConsent(): Boolean = Replay.consent()
+
+    @JvmStatic
+    fun disableReplayForChildApp() = Replay.disableForChild()
 
     @JvmStatic
     fun captureException(throwable: Throwable): SentryId = Sentry.captureException(throwable)

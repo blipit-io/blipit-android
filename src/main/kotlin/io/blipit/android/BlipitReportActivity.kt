@@ -249,7 +249,7 @@ class BlipitReportActivity : Activity() {
         setBusy(true)
         show(t("sending"), false)
         val flat = flattened()
-        val body = ReportPayload.feedback(title, message.trim(), email, ReportDevice.context(this), shapes, image?.width ?: 0, image?.height ?: 0, if (flat == null) 0 else 1, 0, lang)
+        val body = ReportPayload.feedback(title, message.trim(), email, ReportDevice.context(this), shapes, image?.width ?: 0, image?.height ?: 0, if (flat == null) 0 else 1, 0, lang, Replay.forReport())
         Executors.newSingleThreadExecutor().execute {
             val result = runCatching {
                 val receipt = client.send(body)

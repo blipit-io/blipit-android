@@ -188,6 +188,7 @@ object ReportPayload {
         screenshots: Int,
         recordings: Int,
         locale: String,
+        replayId: String? = null,
     ): Map<String, Any?> {
         val body = linkedMapOf<String, Any?>(
             "message" to message,
@@ -199,6 +200,7 @@ object ReportPayload {
         )
         title.trim().takeIf { it.isNotEmpty() }?.let { body["title"] = it }
         email?.trim()?.takeIf { it.isNotEmpty() }?.let { body["email"] = it }
+        replayId?.takeIf { it.matches(Regex("^[0-9a-f]{32}$")) }?.let { body["replay_id"] = it }
         val list = annotations(shapes, width, height)
         if (list.isNotEmpty()) body["annotations"] = listOf(mapOf("position" to 0, "shapes" to list))
         return body
@@ -238,6 +240,12 @@ class ReportClient(endpoint: String, val key: String) {
         Pair(json?.get("recording") == true, (json?.get("recording_max_ms") as? Number)?.toInt() ?: 60_000)
     } catch (e: Exception) {
         Pair(false, 60_000)
+    }
+
+    fun replaySettings(): ReplayPlan? = try {
+        ReplayPlan.fromJson((Json.parse(call("$endpoint/api/v1/feedback/settings", "GET", null, null)) as? Map<*, *>)?.get("replay"))
+    } catch (e: Exception) {
+        null
     }
 
     fun send(body: Map<String, Any?>): ReportReceipt {

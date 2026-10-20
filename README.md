@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("com.github.blipit-io:blipit-android:v0.2.0")
+implementation("com.github.blipit-io:blipit-android:v0.3.0")
 ```
 
 ## Quick start
@@ -62,6 +62,27 @@ Blipit.showReport()
 ```
 
 The reporter asks first: Take a screenshot or Skip. The screenshot opens full screen with the tools above and below it; pinch or double-tap to zoom, mark the problem, then add a title and what happened and send. Reports arrive under Bug reports at app.blipit.io. Screen recording is not offered on Android, because it needs a foreground service that Google Play asks every app to declare and justify.
+
+## Session replay
+
+Replay follows the project's Session replay setting in the dashboard (Off, On errors and bug reports, or All visits, sampled). Nothing is recorded until the person using the app agrees:
+
+```kotlin
+Blipit.setReplayConsent(true)
+Blipit.setReplayConsent(false)
+Blipit.hasReplayConsent()
+```
+
+Consent is off by default and stored on the device. Turning it off stops recording at once and discards anything kept in memory.
+
+- About one frame per second of the app's own screens, encoded as a small H.264 video, plus taps and screen changes. Only while the app is in the foreground; nothing from other apps or the system UI.
+- All text, images, text inputs, WebViews and video players are masked on the device before anything is stored. Mask more views with `android:tag="sentry-mask"`.
+- In errors mode the last 30 seconds stay in memory and are uploaded only with an error or a bug report. A bug report sent with `Blipit.showReport()` includes the replay.
+- No AccessibilityService, no MediaProjection, no screen-capture prompt, no Google Play services, so it also works on Huawei devices. Needs Android 8.0 (API 26) or newer.
+- `replayLabels = true` in `init` keeps labels and button text readable on View-based screens; inputs and images stay masked, and Jetpack Compose screens stay fully masked.
+- Apps for children: set `childDirected = true` in `init`, or call `Blipit.disableReplayForChildApp()`, and replay never starts.
+
+Turning the project setting off stops recording on every device, live and on the next launch.
 
 ## Performance
 

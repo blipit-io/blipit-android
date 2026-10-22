@@ -3,17 +3,8 @@ package io.blipit.android
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import io.sentry.Breadcrumb
-import io.sentry.EventProcessor
-import io.sentry.Hint
-import io.sentry.SentryEvent
-import io.sentry.Sentry
-import io.sentry.SentryLevel
-import io.sentry.SentryOptions
-import io.sentry.android.core.SentryAndroid
-import io.sentry.android.core.SentryAndroidOptions
-import io.sentry.protocol.SentryId
-import io.sentry.protocol.User
+
+typealias Level = io.blipit.Level
 
 class BlipitOptions {
     var key: String = ""
@@ -28,45 +19,28 @@ class BlipitOptions {
 
     @Deprecated("Use waitForReady = true. The time limit now comes from Blipit.")
     var startupDeadlineMs: Long = 0
-    var configure: ((SentryAndroidOptions) -> Unit)? = null
+    var anr: Boolean = true
+    var anrTimeoutMs: Long = 5000
+    var nativeCrashes: Boolean = true
+    var sessions: Boolean = true
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.4.0"
+    const val VERSION = "0.5.0"
+    const val SDK_NAME = "blipit-android"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
     @Volatile
     internal var reporter: ReportClient? = null
 
-    internal val identity = object : EventProcessor {
-        override fun process(event: SentryEvent, hint: Hint): SentryEvent {
-            try {
-                val sdk = event.sdk
-                if (sdk != null && sdk.packageSet.none { it.name == PACKAGE_NAME }) sdk.addPackage(PACKAGE_NAME, VERSION)
-            } catch (_: RuntimeException) {
-            }
-            return event
-        }
-    }
-
-    @JvmStatic
-    @JvmOverloads
-    fun dsn(key: String, project: String, endpoint: String = DEFAULT_ENDPOINT): String {
-        val host = endpoint.substringAfter("://").trimEnd('/')
-        val scheme = if (endpoint.startsWith("http://")) "http" else "https"
-        return "$scheme://$key@$host/$project"
-    }
-
     @JvmStatic
     fun init(context: Context, options: BlipitOptions) {
         require(options.key.isNotEmpty()) { "Blipit.init needs the project's public key" }
         require(options.project.isNotEmpty()) { "Blipit.init needs the project id" }
-        SentryAndroid.init(context) { sentry ->
-            apply(sentry, options)
-            Replay.setup(context, sentry, options)
-            options.configure?.invoke(sentry)
-        }
+        reporter = ReportClient(options.endpoint, options.key)
+        Core.start(context, options)
+        Replay.setup(context, options)
         val app = context.applicationContext as? Application
         Reporter.attach(app)
         Replay.start(app)
@@ -75,17 +49,6 @@ object Blipit {
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
         init(context, BlipitOptions().apply(configure))
-    }
-
-    @JvmStatic
-    fun apply(sentry: SentryOptions, options: BlipitOptions) {
-        sentry.dsn = dsn(options.key, options.project, options.endpoint)
-        sentry.environment = options.environment
-        sentry.release = options.release
-        sentry.tracesSampleRate = options.tracesSampleRate
-        sentry.isSendDefaultPii = false
-        sentry.addEventProcessor(identity)
-        reporter = ReportClient(options.endpoint, options.key)
     }
 
     @JvmStatic
@@ -128,33 +91,32 @@ object Blipit {
     }
 
     @JvmStatic
-    fun captureException(throwable: Throwable): SentryId = Sentry.captureException(throwable)
+    fun captureException(throwable: Throwable): String? = Core.client?.captureException(throwable, true, Level.ERROR)
 
     @JvmStatic
     @JvmOverloads
-    fun captureMessage(message: String, level: SentryLevel = SentryLevel.INFO): SentryId = Sentry.captureMessage(message, level)
+    fun captureMessage(message: String, level: Level = Level.INFO): String? = Core.client?.captureMessage(message, level)
 
     @JvmStatic
     @JvmOverloads
     fun setUser(id: String?, email: String? = null, username: String? = null) {
-        Sentry.setUser(User().also {
-            it.id = id
-            it.email = email
-            it.username = username
-        })
+        Core.client?.setUser(id, email, username)
     }
 
     @JvmStatic
-    fun setTag(key: String, value: String) = Sentry.setTag(key, value)
+    fun setTag(key: String, value: String) {
+        Core.client?.setTag(key, value)
+    }
+
+    @JvmStatic
+    fun setExtra(key: String, value: Any?) {
+        Core.client?.setExtra(key, value)
+    }
 
     @JvmStatic
     @JvmOverloads
-    fun addBreadcrumb(message: String, category: String? = null, level: SentryLevel = SentryLevel.INFO) {
-        Sentry.addBreadcrumb(Breadcrumb().also {
-            it.message = message
-            it.category = category
-            it.level = level
-        })
+    fun addBreadcrumb(message: String, category: String? = null, level: Level = Level.INFO) {
+        Core.client?.addBreadcrumb(category, message, level, null)
     }
 
     @JvmStatic
@@ -187,16 +149,13 @@ object Blipit {
         ip: String? = null,
         userAgent: String? = null,
         target: String? = null,
-    ): SentryId {
-        val context = securityContext(kind, actor, outcome, actorId, ip, userAgent, target)
-        val level = if (kind == "login_failed" || kind == "login_blocked") SentryLevel.WARNING else SentryLevel.INFO
-        return Sentry.captureMessage("$kind for $actor", level) { scope ->
-            scope.setContexts("security", context)
-            scope.setTag("security.kind", kind)
-        }
+    ): String? {
+        val context: Map<String, Any> = securityContext(kind, actor, outcome, actorId, ip, userAgent, target)
+        val level = if (kind == "login_failed" || kind == "login_blocked") Level.WARNING else Level.INFO
+        return Core.client?.captureSecurity(LinkedHashMap(context), "$kind for $actor", level)
     }
 
     @JvmStatic
     @JvmOverloads
-    fun flush(timeoutMillis: Long = 2000) = Sentry.flush(timeoutMillis)
+    fun flush(timeoutMillis: Long = 2000): Boolean = Core.client?.flush(timeoutMillis) ?: true
 }

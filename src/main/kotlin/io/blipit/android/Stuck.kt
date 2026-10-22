@@ -160,7 +160,7 @@ object StuckEvent {
             "message" to "stuck: $kind $subject",
             "stuck" to stuck.filterValues { it != null },
             "contexts" to mapOf("os" to mapOf("name" to "Android", "version" to os)) + (model?.let { mapOf("device" to mapOf("model" to it)) } ?: emptyMap()),
-            "sdk" to mapOf("name" to "blipit-android", "version" to Blipit.VERSION),
+            "sdk" to mapOf("name" to Blipit.SDK_NAME, "version" to Blipit.VERSION),
         )
         if (trail.isNotEmpty()) body["breadcrumbs"] = trail
         release?.let { body["release"] = it }
@@ -295,14 +295,9 @@ internal object Stuck {
     }
 
     private fun flush() {
-        val client = Blipit.reporter ?: return
+        val client = Core.client ?: return
         val batch = synchronized(this) { pending.toList().also { pending.clear() } }
-        val failed = batch.filterNot { client.event(it) }
-        if (failed.isEmpty()) return
-        synchronized(this) {
-            pending.addAll(0, failed)
-            while (pending.size > 10) pending.removeAt(pending.size - 1)
-        }
+        for (body in batch) client.send(LinkedHashMap(body), false)
     }
 
     private fun exits() {

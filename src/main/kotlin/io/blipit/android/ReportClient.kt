@@ -254,15 +254,6 @@ class ReportClient(endpoint: String, val key: String) {
         null
     }
 
-    fun event(body: Map<String, Any?>): Boolean = try {
-        call("$endpoint/api/v1/events", "POST", "application/json", Json.encode(body).toByteArray())
-        true
-    } catch (e: ReportException) {
-        e.status in 400..499 && e.status != 408 && e.status != 429
-    } catch (e: Exception) {
-        false
-    }
-
     fun send(body: Map<String, Any?>): ReportReceipt {
         val json = Json.parse(call("$endpoint/api/v1/feedback", "POST", "application/json", Json.encode(body).toByteArray())) as? Map<*, *>
         val token = json?.get("upload_token") as? String ?: throw ReportException(0)

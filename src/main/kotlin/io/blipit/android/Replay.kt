@@ -9,11 +9,8 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Bundle
-import io.sentry.ScreenshotStrategyType
-import io.sentry.Sentry
-import io.sentry.SentryOptions
-import io.sentry.SentryReplayOptions
-import io.sentry.protocol.SentryId
+import android.view.View
+import java.io.File
 import java.util.concurrent.Executors
 import kotlin.random.Random
 
@@ -78,9 +75,6 @@ internal object Replay {
     private var context: Context? = null
 
     @Volatile
-    private var options: SentryOptions? = null
-
-    @Volatile
     var childDirected = false
 
     @Volatile
@@ -90,29 +84,45 @@ internal object Replay {
     private var running = "off"
 
     @Volatile
+    private var recorder: ReplayRecorder? = null
+
+    @Volatile
+    private var resumed: java.lang.ref.WeakReference<Activity>? = null
+
+    @Volatile
     private var lifecycle = false
 
-    fun setup(app: Context, sentry: SentryOptions, blipit: BlipitOptions) {
+    private val pendingDir: File?
+        get() = context?.let { File(it.noBackupFilesDir, "blipit/replay") }
+
+    fun setup(app: Context, blipit: BlipitOptions) {
         context = app.applicationContext
-        options = sentry
         childDirected = blipit.childDirected
         labelsWanted = blipit.replayLabels
-        val replay = sentry.sessionReplay
-        replay.sessionSampleRate = 0.0
-        replay.onErrorSampleRate = 0.0
-        mask(replay, false)
         if (store == null) store = ReplayStore(app.applicationContext.getSharedPreferences(ReplayStore.FILE, Context.MODE_PRIVATE))
     }
 
     fun start(app: Application?) {
         apply()
         refresh(force = true)
+        val dir = pendingDir
+        val config = Core.client?.config
+        if (dir != null && config != null && Build.VERSION.SDK_INT >= ReplayGate.MIN_API) {
+            io.execute {
+                if (store?.consent == true && !childDirected) ReplayRecorder.uploadPending(config, dir, bitRate()) else dir.deleteRecursively()
+            }
+        }
         if (app == null || lifecycle) return
         lifecycle = true
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) = refresh(force = false)
-            override fun onActivityResumed(activity: Activity) {}
-            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {
+                resumed = java.lang.ref.WeakReference(activity)
+                recorder?.attach(activity)
+            }
+            override fun onActivityPaused(activity: Activity) {
+                recorder?.detach(activity)
+            }
             override fun onActivityCreated(activity: Activity, state: Bundle?) {}
             override fun onActivityStopped(activity: Activity) {}
             override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) {}
@@ -148,49 +158,70 @@ internal object Replay {
 
     @Synchronized
     fun apply() {
-        val sentry = options ?: return
         val s = store ?: return
         val plan = ReplayGate.decide(s.consent, childDirected, Build.VERSION.SDK_INT, s.server)
-        val replay = sentry.sessionReplay
-        val api = runCatching { Sentry.replay() }.getOrNull() ?: return
         if (plan.mode == "off") {
-            replay.sessionSampleRate = 0.0
-            replay.onErrorSampleRate = 0.0
-            if (running != "off") runCatching { api.stop() }
-            running = "off"
+            stop()
             return
         }
-        mask(replay, labelsWanted && plan.labels)
-        replay.quality = if (unmetered()) SentryReplayOptions.SentryReplayQuality.MEDIUM else SentryReplayOptions.SentryReplayQuality.LOW
-        replay.onErrorSampleRate = plan.onErrorSampleRate
-        replay.sessionSampleRate = plan.sessionSampleRate
-        if (running == plan.mode) return
-        if (running != "off") runCatching { api.stop() }
-        if (plan.mode == "sessions" && Random.nextDouble() < plan.sessionSampleRate) api.start() else api.startBuffering()
+        val current = recorder
+        if (current != null && running == plan.mode) {
+            current.labels = labelsWanted && plan.labels
+            return
+        }
+        stop()
+        val config = Core.client?.config ?: return
+        val unmetered = unmetered()
+        val r = ReplayRecorder(
+            config,
+            io,
+            session = plan.mode == "sessions" && Random.nextDouble() < plan.sessionSampleRate,
+            onErrorRate = plan.onErrorSampleRate,
+            labels = labelsWanted && plan.labels,
+            target = if (unmetered) 540 else 360,
+            bitRate = bitRate(unmetered),
+            pendingDir = pendingDir,
+            onPaused = { synchronized(this) { stop() } },
+        )
+        resumed?.get()?.let { r.attach(it) }
+        recorder = r
         running = plan.mode
     }
 
+    private fun stop() {
+        recorder?.stop()
+        recorder = null
+        running = "off"
+    }
+
+    fun onEvent(event: MutableMap<String, Any?>, error: Boolean) {
+        val r = recorder ?: return
+        val crash = event["level"] == "fatal" && (event["tags"] as? Map<*, *>)?.get("mechanism") == "uncaught"
+        when {
+            r.session -> Core.tag(event, "replay_id", r.replayId)
+            error && Random.nextDouble() < r.onErrorRate -> {
+                Core.tag(event, "replay_id", r.replayId)
+                if (crash) r.persistForCrash() else r.flushBuffer()
+            }
+        }
+        if (crash && r.session) r.persistForCrash()
+    }
+
+    fun screen(name: String) {
+        recorder?.screen(name)
+    }
+
+    fun tap(decor: View, x: Float, y: Float) {
+        recorder?.tap(decor, x, y)
+    }
+
     fun forReport(): String? {
-        if (running == "off") return null
-        val controller = options?.replayController ?: return null
-        if (!controller.isRecording) return null
-        val id = runCatching { controller.captureReplay(false) }.getOrNull() ?: return null
-        return if (id == SentryId.EMPTY_ID) null else id.toString()
+        val r = recorder ?: return null
+        if (!r.session) r.flushBuffer()
+        return r.replayId
     }
 
-    private fun mask(replay: SentryReplayOptions, labels: Boolean) {
-        val readable = labels && !composeLoaded()
-        replay.screenshotStrategy = if (readable) ScreenshotStrategyType.PIXEL_COPY else ScreenshotStrategyType.CANVAS
-        replay.setMaskAllImages(true)
-        replay.setMaskAllText(!readable)
-        replay.addMaskViewClass("android.widget.EditText")
-        replay.addMaskViewClass("android.webkit.WebView")
-        replay.addMaskViewClass("android.widget.VideoView")
-        replay.addMaskViewClass("android.view.SurfaceView")
-        replay.addMaskViewClass("android.view.TextureView")
-    }
-
-    private fun composeLoaded(): Boolean = runCatching { Class.forName("androidx.compose.ui.platform.ComposeView") }.isSuccess
+    private fun bitRate(unmetered: Boolean = unmetered()): Int = if (unmetered) 120_000 else 60_000
 
     private fun unmetered(): Boolean {
         val ctx = context ?: return false

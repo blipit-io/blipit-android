@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:usesCleartextTraffic="true">
-        <meta-data android:name="io.sentry.auto-init" android:value="false" />
         <activity android:name="io.blipit.android.HostActivity" android:exported="false" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <activity android:name="io.blipit.android.CrashActivity" android:exported="false" android:process=":crashy" />
     </application>
 </manifest>

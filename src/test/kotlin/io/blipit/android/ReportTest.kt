@@ -1,9 +1,5 @@
 package io.blipit.android
 
-import io.sentry.Hint
-import io.sentry.SentryEvent
-import io.sentry.SentryOptions
-import io.sentry.protocol.SdkVersion
 import java.io.File
 import java.net.ServerSocket
 import kotlin.concurrent.thread
@@ -46,21 +42,6 @@ class ReportTest {
         assertEquals("ar", ReportLanguage.pick(listOf("ar-AE")))
         assertEquals("en", ReportLanguage.pick(listOf("xx")))
         assertNotEquals(ReportLanguage.text("send", "ja"), ReportLanguage.text("send", "en"))
-    }
-
-    @Test
-    fun eventsCarryTheBlipitPackage() {
-        val event = SentryEvent()
-        event.sdk = SdkVersion("sentry.java.android", "8.58.0")
-        Blipit.identity.process(event, Hint())
-        Blipit.identity.process(event, Hint())
-        val ours = event.sdk!!.packageSet.filter { it.name == Blipit.PACKAGE_NAME }
-        assertEquals(1, ours.size)
-        assertEquals(Blipit.VERSION, ours[0].version)
-        val options = SentryOptions()
-        Blipit.apply(options, BlipitOptions().apply { key = "blipit_pk_abc"; project = "7" })
-        assertTrue(options.eventProcessors.contains(Blipit.identity))
-        assertEquals("blipit_pk_abc", Blipit.reporter?.key)
     }
 
     @Test

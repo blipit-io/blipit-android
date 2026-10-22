@@ -24,13 +24,16 @@ class BlipitOptions {
     var endpoint: String = Blipit.DEFAULT_ENDPOINT
     var childDirected: Boolean = false
     var replayLabels: Boolean = false
-    var startupDeadlineMs: Long = Startup.DEFAULT_DEADLINE_MS
+    var waitForReady: Boolean = false
+
+    @Deprecated("Use waitForReady = true. The time limit now comes from Blipit.")
+    var startupDeadlineMs: Long = 0
     var configure: ((SentryAndroidOptions) -> Unit)? = null
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.3.1"
+    const val VERSION = "0.4.0"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
     @Volatile
@@ -67,7 +70,7 @@ object Blipit {
         val app = context.applicationContext as? Application
         Reporter.attach(app)
         Replay.start(app)
-        Startup.start(app, options.startupDeadlineMs)
+        Stuck.setup(context, options)
     }
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
@@ -84,9 +87,6 @@ object Blipit {
         sentry.addEventProcessor(identity)
         reporter = ReportClient(options.endpoint, options.key)
     }
-
-    @JvmStatic
-    fun reportReady() = Startup.ready()
 
     @JvmStatic
     @JvmOverloads
@@ -107,6 +107,25 @@ object Blipit {
 
     @JvmStatic
     fun disableReplayForChildApp() = Replay.disableForChild()
+
+    @JvmStatic
+    fun reportReady() = Stuck.end(FlowWatch.STARTUP)
+
+    @JvmStatic
+    fun startFlow(name: String) {
+        StuckEvent.name(name, 64)?.let { Stuck.start(it) }
+    }
+
+    @JvmStatic
+    fun flowStep(name: String, step: String) {
+        val flow = StuckEvent.name(name, 64) ?: return
+        StuckEvent.name(step, 128)?.let { Stuck.step(flow, it) }
+    }
+
+    @JvmStatic
+    fun endFlow(name: String) {
+        StuckEvent.name(name, 64)?.let { Stuck.end(it) }
+    }
 
     @JvmStatic
     fun captureException(throwable: Throwable): SentryId = Sentry.captureException(throwable)

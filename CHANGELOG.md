@@ -1,3 +1,7 @@
+## 0.5.1
+
+- Platform mismatch: when Blipit refuses data because the key belongs to a project for another platform (HTTP 409 platform_mismatch), the SDK logs one clear error and stops sending for the rest of the launch. Bug reports and session replay stop at once; crash reports, sessions and traces stop once the bundled blipit-java has the same check. When this branch merges with the 0.6.0 shake and screenshot release, 0.6.0 folds this in.
+
 ## 0.5.0
 
 - Built on blipit-nuggets, Blipit's own crash-reporting core shared with the Java SDK. The library no longer contains or downloads any third-party crash library.

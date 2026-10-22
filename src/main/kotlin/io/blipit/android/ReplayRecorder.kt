@@ -163,7 +163,7 @@ object ReplayPayload {
 
     @JvmStatic
     fun accepted(status: Int, body: String): Boolean? {
-        if (status == 429) return false
+        if (status == 429 || PlatformMismatch.check(status, body)) return false
         if (status !in 200..299) return null
         val json = runCatching { Json.parse(body) as? Map<*, *> }.getOrNull() ?: return true
         val reason = json["reason"] as? String
@@ -342,6 +342,7 @@ internal class ReplayRecorder(
         private val composeLoaded: Boolean by lazy { runCatching { Class.forName("androidx.compose.ui.platform.ComposeView") }.isSuccess }
 
         fun upload(config: Config, replayId: String, n: Int, startedAt: Long, frames: List<ReplayFrame>, marks: List<Map<String, Any?>>, screen: String?, bitRate: Int): Boolean? {
+            if (PlatformMismatch.blocked) return false
             if (frames.isEmpty()) return null
             val video = runCatching { Mp4.encode(frames, bitRate) }.getOrNull() ?: return null
             val events = ReplayPayload.events(n, frames, marks, video.size, screen)

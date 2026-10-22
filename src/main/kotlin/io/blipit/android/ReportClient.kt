@@ -213,6 +213,7 @@ class ReportClient(endpoint: String, val key: String) {
     val endpoint: String = endpoint.trimEnd('/')
 
     private fun call(url: String, method: String, type: String?, body: ByteArray?, headers: Map<String, String> = emptyMap()): String {
+        if (PlatformMismatch.blocked) throw ReportException(409)
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
@@ -228,7 +229,10 @@ class ReportClient(endpoint: String, val key: String) {
             }
             val status = conn.responseCode
             val text = (if (status in 200..299) conn.inputStream else conn.errorStream)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
-            if (status !in 200..299) throw ReportException(status)
+            if (status !in 200..299) {
+                PlatformMismatch.check(status, text)
+                throw ReportException(status)
+            }
             return text
         } finally {
             conn.disconnect()

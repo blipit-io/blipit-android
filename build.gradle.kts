@@ -53,7 +53,7 @@ kotlin {
 }
 
 dependencies {
-    api("com.github.blipit-io:blipit-java:v0.2.0")
+    api("com.github.blipit-io:blipit-java:v0.2.1")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")

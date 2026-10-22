@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("com.github.blipit-io:blipit-android:v0.5.0")
+implementation("com.github.blipit-io:blipit-android:v0.6.0")
 ```
 
 ## Quick start
@@ -75,6 +75,38 @@ Blipit.showReport()
 
 The reporter asks first: Take a screenshot or Skip. The screenshot opens full screen with the tools above and below it; pinch or double-tap to zoom, mark the problem, then add a title and what happened and send. Reports arrive under Bug reports at app.blipit.io. Screen recording is not offered on Android, because it needs a foreground service that Google Play asks every app to declare and justify.
 
+### Ways to open the reporter
+
+A Report a bug item in a Profile menu would capture the Profile screen, not the screen with the bug. These options let people report from where the bug is. All are off by default except the screen picker:
+
+```kotlin
+Blipit.init(this) {
+    key = "<public key>"
+    project = "<project id>"
+    shakeToReport = true
+    screenshotToReport = true
+    twoFingerReport = true
+    reportAfterCrash = true
+    screenPicker = true
+}
+```
+
+- `shakeToReport`: shaking the phone opens the reporter on the current screen. The accelerometer is used only while the app is on screen; no permission. One shake opens one reporter, never a second one on top.
+- `screenshotToReport`: on Android 14 and later, a normal screenshot in the app shows a small prompt, Report a bug with this screen? (Report / Not now, gone after 6 seconds). Report opens the reporter with Blipit's own capture of the screen. Uses `Activity.registerScreenCaptureCallback` and the normal permission `DETECT_SCREEN_CAPTURE`, which the library declares. The SDK only learns that a screenshot happened; it never reads the screenshot, the gallery or storage. On Android 13 and older it does nothing.
+- `twoFingerReport`: two fingers held still for about a second anywhere open the reporter. Touches are observed, never consumed.
+- `reportAfterCrash`: on the first launch after a crash Blipit caught, a prompt asks The app closed unexpectedly. Tell us what you were doing? (Tell us / Not now). The report carries the crash's event id, so the dashboard shows it on the crash issue and the crash on the report. Asked once per crash.
+- `screenPicker` (on): when your code calls `Blipit.showReport()`, Take a screenshot offers the current screen and up to 3 earlier screens. The earlier ones are small snapshots taken when a screen opens, kept in memory only (never on disk, in crash reports or logs), with views tagged `blipit-mask` and password fields blacked out, and cleared after 3 minutes in the background or when `setReplayConsent(false)` is called. Only the chosen one is uploaded.
+
+Apps with one activity (Jetpack Compose, fragments) tell Blipit when the screen changes, so the picker, breadcrumbs and replay know each screen:
+
+```kotlin
+navController.addOnDestinationChangedListener { _, d, _ -> Blipit.setScreen(d.route ?: d.label?.toString() ?: "screen") }
+```
+
+Use fixed screen names such as routes, never emails or other personal data.
+
+The floating button can also be switched on from the dashboard: Bug reports settings, Floating button: Off, Everyone or Testers only. With Testers only, add tester user ids or emails there and call `Blipit.setUser(id, email)` in the app; the SDK sends them with the settings request and gets back only whether to show the button. `showReportButton()` still shows it for everyone.
+
 ## Session replay
 
 Replay follows the project's Session replay setting in the dashboard (Off, On errors and bug reports, or All visits, sampled). Nothing is recorded until the person using the app agrees:
@@ -124,10 +156,15 @@ Call `startFlow` when the person starts the action (taps Continue with Google), 
 
 What to declare when you ship an app with Blipit:
 
-- **Google Play**: in the Data safety form declare App info and performance, Crash logs and Diagnostics: collected, not shared, processed in transit with encryption, not optional, for App functionality and Analytics. Blipit adds no permissions, reads no Android ID, IMEI or advertising id, and starts no WorkManager job or foreground service. If you call `setUser`, also declare User IDs or Email address.
+- **Google Play**: in the Data safety form declare App info and performance, Crash logs and Diagnostics: collected, not shared, processed in transit with encryption, not optional, for App functionality and Analytics. Blipit adds only normal permissions, reads no Android ID, IMEI or advertising id, and starts no WorkManager job or foreground service. If you call `setUser`, also declare User IDs or Email address.
 - **Huawei AppGallery**: the Android path needs neither Google Play services nor HMS Core. In your privacy statement, list crash and diagnostic data sent to Blipit (Louward Labs FZC LLC) for app stability, and the same items in the AppGallery Connect privacy section.
 
 Session replay, when you turn it on, is covered in its own section and adds screen content to these declarations.
+
+The report triggers:
+
+- **Google Play**: `screenshotToReport` relies on `DETECT_SCREEN_CAPTURE`, a normal install-time permission (no prompt, no review form). In Data safety nothing new is collected: say the app learns that a screenshot was taken but reads no screenshot, photo or file. Shake uses the accelerometer without a permission and nothing from it is sent. A report sent from a trigger is the same Bug report row as before (Photos, Messages).
+- **Huawei AppGallery**: every trigger uses Android platform APIs only, no Google Play services and no HMS Core, and behaves the same. List bug report screenshots in the privacy statement if you use the reporter.
 
 ## Performance
 
@@ -164,7 +201,7 @@ Not collected: Android ID, IMEI, advertising id, location, contacts, IP address 
 Google Play:
 
 - [ ] Data safety form filled from the table above (Crash logs, Diagnostics; Personal info only if you call `setUser` with an email or name).
-- [ ] Permissions the library adds: `INTERNET` and `ACCESS_NETWORK_STATE`, both normal permissions. No restricted or dangerous permission, no `QUERY_ALL_PACKAGES`, no foreground service, no AccessibilityService, no MediaProjection.
+- [ ] Permissions the library adds: `INTERNET`, `ACCESS_NETWORK_STATE` and `DETECT_SCREEN_CAPTURE` (Android 14+, for `screenshotToReport`), all normal permissions. No restricted or dangerous permission, no `QUERY_ALL_PACKAGES`, no foreground service, no AccessibilityService, no MediaProjection.
 - [ ] No background service or job is added for monitoring: reports are sent from a daemon thread while the app runs and on the next launch.
 - [ ] No hardware identifiers: no Android ID, IMEI, MAC or serial; the install id is random and app-scoped.
 - [ ] Native library `libblipit-nuggets.so` is built with 16 KB page alignment (Android 15+ requirement) for arm64-v8a, armeabi-v7a, x86 and x86_64.

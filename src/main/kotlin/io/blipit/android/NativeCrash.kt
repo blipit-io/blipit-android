@@ -117,6 +117,7 @@ internal object NativeCrash {
         extra["native"] = linkedMapOf("thread" to parsed.thread, "tid" to parsed.tid, "registers" to parsed.registers, "libraries" to parsed.libraries)
         event.remove("breadcrumbs")
         n.outbox.persist("/api/v1/events", event)
+        CrashMark.write(report.parentFile, event["event_id"] as? String)
         return true
     }
 }

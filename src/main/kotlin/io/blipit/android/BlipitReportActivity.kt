@@ -39,6 +39,11 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 class BlipitReportActivity : Activity() {
+    companion object {
+        internal const val EXTRA_CRASH = "io.blipit.crash_id"
+        internal const val EXTRA_PICKER = "io.blipit.picker"
+    }
+
     internal val lang = ReportLanguage.pick()
     internal var image: Bitmap? = null
     internal val shapes = mutableListOf<ReportShape>()
@@ -47,6 +52,8 @@ class BlipitReportActivity : Activity() {
     internal var status: TextView? = null
     internal var busy = false
     internal var stage = "choice"
+    private val crashId by lazy { intent?.getStringExtra(EXTRA_CRASH) }
+    private val picker by lazy { intent?.getBooleanExtra(EXTRA_PICKER, false) == true }
     private val main = Handler(Looper.getMainLooper())
 
     internal fun t(key: String) = ReportLanguage.text(key, lang)
@@ -73,6 +80,11 @@ class BlipitReportActivity : Activity() {
         showChoice()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        Reporter.closed()
+    }
+
     private fun layoutDirectionFor() {
         root.layoutDirection = if (lang == "ar") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
     }
@@ -96,7 +108,7 @@ class BlipitReportActivity : Activity() {
         when {
             busy -> Unit
             stage == "details" && image != null -> showEditor()
-            stage == "details" || stage == "editor" -> showChoice()
+            stage == "details" || stage == "editor" || stage == "picker" -> showChoice()
             else -> finish()
         }
     }
@@ -124,9 +136,55 @@ class BlipitReportActivity : Activity() {
             Reporter.capture { bitmap ->
                 root.visibility = View.VISIBLE
                 image = bitmap
-                if (bitmap != null) showEditor() else showDetails(t("noShot"))
+                val earlier = if (picker && bitmap != null) Reporter.shots.earlier(Reporter.currentScreen()) else emptyList()
+                when {
+                    bitmap == null -> showDetails(t("noShot"))
+                    earlier.isNotEmpty() -> showPicker(bitmap, earlier)
+                    else -> showEditor()
+                }
             }
         }, 250)
+    }
+
+    private fun showPicker(now: Bitmap, earlier: List<Bitmap>) {
+        stage = "picker"
+        val column = vertical()
+        column.setPadding(dpi(20f), dpi(8f), dpi(20f), dpi(20f))
+        column.addView(barButton(t("mBack"), Glyph.Kind.BACK) { showChoice() }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        column.addView(text(t("pickTitle"), 22f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f); bottomMargin = dpi(18f) })
+        val row = horizontal()
+        val height = dpi(300f)
+        (listOf(now to t("pickNow")) + earlier.map { it to t("pickBefore") }).forEach { (bitmap, label) ->
+            val item = vertical().apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                contentDescription = label
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    image = bitmap
+                    shapes.clear()
+                    showEditor()
+                }
+            }
+            val width = (height * bitmap.width / bitmap.height.coerceAtLeast(1).toFloat()).toInt()
+            item.addView(ImageView(this).apply {
+                setImageBitmap(bitmap)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                background = rounded(ReportTheme.CARD, 12f, Color.argb(40, 255, 255, 255))
+                clipToOutline = true
+            }, LinearLayout.LayoutParams(width, height))
+            item.addView(text(label, 14f, false).apply {
+                setTextColor(ReportTheme.MUTED)
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dpi(8f) })
+            row.addView(item, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dpi(14f) })
+        }
+        val scroll = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        }
+        column.addView(scroll, LinearLayout.LayoutParams(-1, -2))
+        set(column)
     }
 
     internal fun showEditor() {
@@ -249,7 +307,7 @@ class BlipitReportActivity : Activity() {
         setBusy(true)
         show(t("sending"), false)
         val flat = flattened()
-        val body = ReportPayload.feedback(title, message.trim(), email, ReportDevice.context(this), shapes, image?.width ?: 0, image?.height ?: 0, if (flat == null) 0 else 1, 0, lang, Replay.forReport())
+        val body = ReportPayload.feedback(title, message.trim(), email, ReportDevice.context(this), shapes, image?.width ?: 0, image?.height ?: 0, if (flat == null) 0 else 1, 0, lang, Replay.forReport(), crashId)
         Executors.newSingleThreadExecutor().execute {
             val result = runCatching {
                 val receipt = client.send(body)

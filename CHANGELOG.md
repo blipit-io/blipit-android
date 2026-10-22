@@ -1,3 +1,14 @@
+## 0.6.0
+
+- Shake to report (`shakeToReport = true`, off by default): shaking the phone opens the reporter on the screen the person is on. Uses the accelerometer only while the app is on screen; no permission. One shake opens one reporter, never while one is already open.
+- Screenshot to report (`screenshotToReport = true`, off by default): on Android 14 and later, when the person takes a normal screenshot in the app, a small prompt asks "Report a bug with this screen?" (Report / Not now, gone after 6 seconds). Report opens the reporter with Blipit's own capture of the screen. Adds the normal permission `DETECT_SCREEN_CAPTURE`; the SDK only learns that a screenshot happened and never reads the screenshot, the gallery or storage. Does nothing on Android 13 and older.
+- Two-finger press and hold (`twoFingerReport = true`, off by default): two fingers held still for about a second anywhere open the reporter. Touches are only observed, never consumed, so the app's own gestures keep working.
+- Report after a crash (`reportAfterCrash = true`, off by default): on the first launch after a crash Blipit caught, a prompt asks "The app closed unexpectedly. Tell us what you were doing?". The report is linked to the crash, so it shows on the crash issue and the crash shows on the report.
+- Which screen? (`screenPicker`, on by default because it only changes the reporter UI): when the app opens the reporter from code, for example from a Profile menu, Take a screenshot shows the current screen and up to 3 earlier screens to pick from. The earlier screens are small snapshots kept in memory only, with `blipit-mask` views and password fields blacked out, cleared after 3 minutes in the background or when replay consent is withdrawn; only the chosen one is uploaded. Set `screenPicker = false` to skip it.
+- Floating button from the dashboard: the project setting Floating button (Off, Everyone, Testers only) decides whether the Report a bug button shows on its own. The SDK sends the id and email from `setUser` and gets back only yes or no; the tester list stays on the server. `showReportButton()` keeps working as before.
+- `Blipit.setScreen(name)`: tells Blipit which screen is showing in single-activity apps (Jetpack Compose, fragments). It adds the navigation breadcrumb, marks the screen in session replay and gives the screen picker one snapshot per named screen.
+- For the React Native and Flutter bridges: `setReportHandler`, `attach`, `lastCrashId` and `promptAfterCrash`.
+
 ## 0.5.0
 
 - Built on blipit-nuggets, Blipit's own crash-reporting core shared with the Java SDK. The library no longer contains or downloads any third-party crash library.

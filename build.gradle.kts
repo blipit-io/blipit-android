@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.blipit"
-version = "0.5.0"
+version = "0.6.0"
 
 android {
     namespace = "io.blipit.android"
@@ -65,7 +65,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "io.blipit"
             artifactId = "blipit-android"
-            version = "0.5.0"
+            version = "0.6.0"
             afterEvaluate {
                 from(components["release"])
             }

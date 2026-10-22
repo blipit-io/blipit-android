@@ -36,6 +36,9 @@ internal object Core {
     var screen: String? = null
 
     @Volatile
+    var pendingCrash: String? = null
+
+    @Volatile
     private var started = 0
 
     private var backgroundAt = 0L
@@ -64,7 +67,10 @@ internal object Core {
             this.dir = dir
             sendCrashNow = false
             contexts.putAll(device(app))
-            hook = Config.Hook { event, error -> Replay.onEvent(event, error) }
+            hook = Config.Hook { event, error ->
+                Replay.onEvent(event, error)
+                if (event["level"] == "fatal" && (event["tags"] as? Map<*, *>)?.get("mechanism") == "uncaught") CrashMark.write(dir, event["event_id"] as? String)
+            }
         }
         val n = runCatching { Nuggets(config) }.getOrElse {
             config.dir = null
@@ -75,6 +81,7 @@ internal object Core {
         n.installCrashHandler()
         val report = File(dir, "native-crash.txt")
         val crashed = NativeCrash.collect(n, report, app.applicationInfo?.nativeLibraryDir)
+        CrashMark.take(dir)?.let { pendingCrash = it }
         n.recoverSession(if (crashed) "crashed" else "abnormal")
         if (options.nativeCrashes && !nativeInstalled && config.dir != null) nativeInstalled = NativeCrash.install(report)
         installId = installId(dir)
@@ -145,7 +152,7 @@ internal object Core {
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, state: Bundle?) {
                 crumb("ui.lifecycle", activity.javaClass.simpleName, mapOf("state" to "created"))
-                activity.window?.let { w -> if (w.callback != null && w.callback !is TapCallback) w.callback = TapCallback(w, w.callback) }
+                observe(activity)
                 if (options.tracesSampleRate > 0 && Random.nextDouble() < options.tracesSampleRate) {
                     loads[activity] = longArrayOf(System.currentTimeMillis(), SystemClock.elapsedRealtime())
                 }
@@ -211,6 +218,16 @@ internal object Core {
         client?.outbox?.kick()
     }
 
+    fun screenChanged(name: String) {
+        screen = name
+        crumb("navigation", name, mapOf("state" to "resumed", "to" to name))
+        Replay.screen(name)
+    }
+
+    fun observe(activity: Activity) {
+        activity.window?.let { w -> if (w.callback != null && w.callback !is TapCallback) w.callback = TapCallback(w, w.callback) }
+    }
+
     fun tap(window: Window, event: MotionEvent) {
         val decor = window.peekDecorView() ?: return
         val target = touched(decor, event.x.toInt(), event.y.toInt())
@@ -237,7 +254,10 @@ internal object Core {
 
 internal class TapCallback(private val window: Window, private val inner: Window.Callback) : Window.Callback by inner {
     override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
-        if (event != null && event.actionMasked == MotionEvent.ACTION_UP) runCatching { Core.tap(window, event) }
+        if (event != null) {
+            if (event.actionMasked == MotionEvent.ACTION_UP) runCatching { Core.tap(window, event) }
+            runCatching { Reporter.touch(event) }
+        }
         return inner.dispatchTouchEvent(event)
     }
 }

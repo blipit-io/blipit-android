@@ -189,6 +189,7 @@ object ReportPayload {
         recordings: Int,
         locale: String,
         replayId: String? = null,
+        eventId: String? = null,
     ): Map<String, Any?> {
         val body = linkedMapOf<String, Any?>(
             "message" to message,
@@ -201,6 +202,7 @@ object ReportPayload {
         title.trim().takeIf { it.isNotEmpty() }?.let { body["title"] = it }
         email?.trim()?.takeIf { it.isNotEmpty() }?.let { body["email"] = it }
         replayId?.takeIf { it.matches(Regex("^[0-9a-f]{32}$")) }?.let { body["replay_id"] = it }
+        eventId?.takeIf { it.matches(Regex("^[0-9a-f]{32}$")) }?.let { body["event_id"] = it }
         val list = annotations(shapes, width, height)
         if (list.isNotEmpty()) body["annotations"] = listOf(mapOf("position" to 0, "shapes" to list))
         return body
@@ -244,6 +246,12 @@ class ReportClient(endpoint: String, val key: String) {
 
     fun replaySettings(): ReplayPlan? = try {
         ReplayPlan.fromJson((Json.parse(call("$endpoint/api/v1/feedback/settings", "GET", null, null)) as? Map<*, *>)?.get("replay"))
+    } catch (e: Exception) {
+        null
+    }
+
+    fun buttonSettings(headers: Map<String, String>): Boolean? = try {
+        ReportButton.parse(Json.parse(call("$endpoint/api/v1/feedback/settings", "GET", null, null, headers)))
     } catch (e: Exception) {
         null
     }

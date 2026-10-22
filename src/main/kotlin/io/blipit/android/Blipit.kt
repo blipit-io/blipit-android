@@ -23,11 +23,16 @@ class BlipitOptions {
     var anrTimeoutMs: Long = 5000
     var nativeCrashes: Boolean = true
     var sessions: Boolean = true
+    var shakeToReport: Boolean = false
+    var screenshotToReport: Boolean = false
+    var twoFingerReport: Boolean = false
+    var reportAfterCrash: Boolean = false
+    var screenPicker: Boolean = true
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.5.0"
+    const val VERSION = "0.6.0"
     const val SDK_NAME = "blipit-android"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
@@ -43,6 +48,7 @@ object Blipit {
         Replay.setup(context, options)
         val app = context.applicationContext as? Application
         Reporter.attach(app)
+        Reporter.refreshButton()
         Replay.start(app)
         Stuck.setup(context, options)
     }
@@ -63,7 +69,31 @@ object Blipit {
     fun hideReportButton() = Reporter.hideButton()
 
     @JvmStatic
-    fun setReplayConsent(granted: Boolean) = Replay.setConsent(granted)
+    fun setReportHandler(handler: ((trigger: String, crashId: String?) -> Unit)?) {
+        Reporter.handler = handler
+    }
+
+    @JvmStatic
+    fun setScreen(name: String) {
+        val clean = StuckEvent.name(name, 128) ?: return
+        Core.screenChanged(clean)
+        Reporter.screen(clean)
+    }
+
+    @JvmStatic
+    fun attach(activity: Activity) = Reporter.attachActivity(activity)
+
+    @JvmStatic
+    fun lastCrashId(): String? = Core.pendingCrash.also { Core.pendingCrash = null }
+
+    @JvmStatic
+    fun promptAfterCrash(eventId: String) = Reporter.promptCrash(eventId)
+
+    @JvmStatic
+    fun setReplayConsent(granted: Boolean) {
+        Replay.setConsent(granted)
+        if (!granted) Reporter.forgetScreens()
+    }
 
     @JvmStatic
     fun hasReplayConsent(): Boolean = Replay.consent()
@@ -101,6 +131,7 @@ object Blipit {
     @JvmOverloads
     fun setUser(id: String?, email: String? = null, username: String? = null) {
         Core.client?.setUser(id, email, username)
+        Reporter.user(id, email)
     }
 
     @JvmStatic

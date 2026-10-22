@@ -163,7 +163,7 @@ class ReportFlowTest {
         val port = serve()
         val app = instrumentation.targetContext.applicationContext
         instrumentation.runOnMainSync {
-            Blipit.init(app, BlipitOptions().apply { key = "blipit_pk_test"; project = "7"; endpoint = "http://127.0.0.1:$port" })
+            Blipit.init(app, BlipitOptions().apply { key = "blipit_pk_test"; project = "7"; endpoint = "http://127.0.0.1:$port"; startupDeadlineMs = 0 })
         }
         ActivityScenario.launch(HostActivity::class.java).use {
             Blipit.showReportButton()

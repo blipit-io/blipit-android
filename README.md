@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("com.github.blipit-io:blipit-android:v0.3.0")
+implementation("com.github.blipit-io:blipit-android:v0.3.1")
 ```
 
 ## Quick start
@@ -50,6 +50,27 @@ Blipit.setTag("region", "ap-southeast-1")
 Blipit.addBreadcrumb("opened checkout", category = "ui")
 Blipit.captureSecurity("login_failed", "ana@example.com", ip = "10.0.0.1")
 Blipit.flush()
+```
+
+## Stuck on startup
+
+An app that never gets past its splash or loading screen does not crash or throw, so nothing is reported on its own. Call `reportReady` once the first real screen can be used:
+
+```kotlin
+Blipit.addBreadcrumb("session restored", category = "startup")
+Blipit.reportReady()
+```
+
+From the first activity start, Blipit counts the time the app is in the foreground (time in the background is not counted). If `reportReady` has not been called after 20 seconds, it sends one warning for that launch: `App did not become ready within 20 s`, with the tags `startup.stalled=true`, `startup.deadline_ms` and `startup.screen` (the activity on screen) and the breadcrumbs added so far. Every such launch is grouped into one Stuck on startup issue. A later `reportReady` adds an `App became ready after N ms` breadcrumb instead of a second event, and also calls Sentry's `reportFullyDisplayed`, so apps with time to full display tracing on get the measurement too. Calling it more than once is fine.
+
+Change the deadline, or turn the check off with 0:
+
+```kotlin
+Blipit.init(this) {
+    key = "<public key>"
+    project = "<project id>"
+    startupDeadlineMs = 30_000
+}
 ```
 
 ## Bug reports

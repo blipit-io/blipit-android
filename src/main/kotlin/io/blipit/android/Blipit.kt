@@ -24,12 +24,13 @@ class BlipitOptions {
     var endpoint: String = Blipit.DEFAULT_ENDPOINT
     var childDirected: Boolean = false
     var replayLabels: Boolean = false
+    var startupDeadlineMs: Long = Startup.DEFAULT_DEADLINE_MS
     var configure: ((SentryAndroidOptions) -> Unit)? = null
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.3.0"
+    const val VERSION = "0.3.1"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
     @Volatile
@@ -66,6 +67,7 @@ object Blipit {
         val app = context.applicationContext as? Application
         Reporter.attach(app)
         Replay.start(app)
+        Startup.start(app, options.startupDeadlineMs)
     }
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
@@ -82,6 +84,9 @@ object Blipit {
         sentry.addEventProcessor(identity)
         reporter = ReportClient(options.endpoint, options.key)
     }
+
+    @JvmStatic
+    fun reportReady() = Startup.ready()
 
     @JvmStatic
     @JvmOverloads

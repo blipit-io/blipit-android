@@ -1,3 +1,7 @@
+## 0.6.1
+
+- The report screen no longer sets the status and navigation bar colours with the APIs Android 15 deprecated. On Android 15 and later its navy background fills the area behind the bars; older versions show the system bars in their default colour. Google Play stops warning apps that bundle the SDK about deprecated edge-to-edge APIs.
+
 ## 0.6.0
 
 - Shake to report (`shakeToReport = true`, off by default): shaking the phone opens the reporter on the screen the person is on. Uses the accelerometer only while the app is on screen; no permission. One shake opens one reporter, never while one is already open.

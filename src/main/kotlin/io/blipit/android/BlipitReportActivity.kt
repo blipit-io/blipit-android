@@ -63,12 +63,6 @@ class BlipitReportActivity : Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        if (Build.VERSION.SDK_INT >= 21) {
-            @Suppress("DEPRECATION")
-            window.statusBarColor = ReportTheme.NAVY
-            @Suppress("DEPRECATION")
-            window.navigationBarColor = ReportTheme.NAVY
-        }
         root.setBackgroundColor(ReportTheme.NAVY)
         root.setOnApplyWindowInsetsListener { v, insets ->
             val (l, t, r, b) = bars(insets)

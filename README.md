@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 ```
 
 ```kotlin
-implementation("com.github.blipit-io:blipit-android:v0.6.0")
+implementation("com.github.blipit-io:blipit-android:v0.7.0")
 ```
 
 ## Quick start
@@ -47,9 +47,38 @@ Reported on their own:
 - Native (NDK) crashes: a signal handler (SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGTRAP) writes the signal, thread, registers, the raw stack addresses and the loaded libraries, and the report is sent on the next launch. Off with `nativeCrashes = false`.
 - Sessions for release health: a session starts when the app comes to the foreground and ends after 30 seconds in the background; crashes mark it crashed, a process that died without a crash marks it abnormal. Off with `sessions = false`.
 - Breadcrumbs: screen changes and activity lifecycle, foreground and background, taps (view id or class, never the text), low memory.
+- Failed requests, with one line on your `OkHttpClient` (see below).
 - Device context: Android version, device model and screen size.
 
 Events wait in an offline queue under the app's `no_backup` folder (at most 100) and are sent when the network is back. When ingest answers 429 the SDK pauses for `Retry-After` seconds; server errors are retried with backoff.
+
+## Failed requests (OkHttp)
+
+Android has no global hook for OkHttp, so add Blipit's interceptor where you build your client, once:
+
+```kotlin
+val client = OkHttpClient.Builder()
+    .addInterceptor(BlipitInterceptor())
+    .build()
+```
+
+Retrofit, Ktor (`HttpClient(OkHttp) { engine { addInterceptor(BlipitInterceptor()) } }`) and Coil take the same client. From then on every request that ends with an `IOException` (timeout, no connection, host not found, TLS failure; a cancel does not count) or an HTTP 5xx is sent as an error `HTTPRequestFailed`, for example `GET api.example.com/orders/123 failed: 503` or `POST api.example.com/cart failed: SocketTimeoutException`. It carries the method, the URL without query string, the status, the exception, the duration and the breadcrumbs; never headers or bodies. 4xx answers are left out. One event per method, host and path per minute, repeats counted into the next one (`extra.http.repeated`); Blipit groups all failures of one endpoint into one issue, with ids and UUIDs in the path folded together. Each request also leaves an `http` breadcrumb. Requests to Blipit are skipped. OkHttp 4 and 5 both work and stay your own dependency. Blipit can switch it off or change the pace from its settings; `httpFailures = false` or `networkBreadcrumbs = false` turn it off in the app. `HttpURLConnection` is not covered.
+
+## Failed starts
+
+When the app shows its own error screen instead of the first usable screen, call this instead of `reportReady()`:
+
+```kotlin
+Blipit.reportReady(failed = "sessionUnreadable")
+```
+
+and for a caught exception, with the step it failed in:
+
+```kotlin
+try { loadSession() } catch (e: Exception) { Blipit.captureStartup(e, step = "auth") }
+```
+
+Both send one warning `StartupFailed`, grouped by reason, with every breadcrumb of the launch. `captureStartup` records the exception class, message, cause chain and the Keystore error code when there is one. Calls made before `init` are kept and sent once it runs, events wait on disk until delivered, and the last launch's breadcrumbs ride on the next launch's first event as `extra.previous_launch`. Same names and event shape as the Swift SDK.
 
 ## Manual capture
 
@@ -187,6 +216,7 @@ Set `tracesSampleRate = 0.2` in `init` and activity loads (from create to the fi
 | --- | --- | --- |
 | Crash and error reports: exception type, message, stack frames; for native crashes the signal, registers and library paths | Every crash, ANR or `captureException` | App info and performance: Crash logs |
 | Breadcrumbs: screen names, lifecycle, taps (view id or class), your own `addBreadcrumb` text | Attached to each report | App info and performance: Diagnostics; App activity: App interactions |
+| Failed requests and request breadcrumbs: method, URL without query, status, exception name, duration | Only with `BlipitInterceptor` on your OkHttp client | App info and performance: Diagnostics |
 | Device: Android version, device model, screen size; app release and environment | Every report and session | App info and performance: Diagnostics |
 | Session: random session id, random install id (created on first launch, removed with the app), start time, status, error count | Start and end of each session | App info and performance: Diagnostics |
 | `setUser` id, email, username | Only if your code calls it | Personal info: User IDs, Email address, Name |

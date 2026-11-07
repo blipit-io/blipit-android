@@ -28,11 +28,13 @@ class BlipitOptions {
     var twoFingerReport: Boolean = false
     var reportAfterCrash: Boolean = false
     var screenPicker: Boolean = true
+    var httpFailures: Boolean = true
+    var networkBreadcrumbs: Boolean = true
 }
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.6.1"
+    const val VERSION = "0.7.0"
     const val SDK_NAME = "blipit-android"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 
@@ -51,6 +53,7 @@ object Blipit {
         Reporter.refreshButton()
         Replay.start(app)
         Stuck.setup(context, options)
+        Core.client?.let { Startup.started(it) }
     }
 
     fun init(context: Context, configure: BlipitOptions.() -> Unit) {
@@ -102,7 +105,20 @@ object Blipit {
     fun disableReplayForChildApp() = Replay.disableForChild()
 
     @JvmStatic
-    fun reportReady() = Stuck.end(FlowWatch.STARTUP)
+    @JvmOverloads
+    fun reportReady(failed: String? = null): String? {
+        Stuck.end(FlowWatch.STARTUP)
+        val reason = failed?.let { StuckEvent.name(it, 256) } ?: return null
+        val n = Core.client ?: return null.also { Startup.whenStarted { Startup.failed(it, reason) } }
+        return Startup.failed(n, reason)
+    }
+
+    @JvmStatic
+    fun captureStartup(error: Throwable, step: String): String? {
+        val clean = StuckEvent.name(step, 128) ?: "startup"
+        val n = Core.client ?: return null.also { Startup.whenStarted { Startup.capture(it, error, clean) } }
+        return Startup.capture(n, error, clean)
+    }
 
     @JvmStatic
     fun startFlow(name: String) {
@@ -121,11 +137,17 @@ object Blipit {
     }
 
     @JvmStatic
-    fun captureException(throwable: Throwable): String? = Core.client?.captureException(throwable, true, Level.ERROR)
+    fun captureException(throwable: Throwable): String? {
+        val n = Core.client ?: return null.also { Startup.whenStarted { it.captureException(throwable, true, Level.ERROR) } }
+        return n.captureException(throwable, true, Level.ERROR)
+    }
 
     @JvmStatic
     @JvmOverloads
-    fun captureMessage(message: String, level: Level = Level.INFO): String? = Core.client?.captureMessage(message, level)
+    fun captureMessage(message: String, level: Level = Level.INFO): String? {
+        val n = Core.client ?: return null.also { Startup.whenStarted { it.captureMessage(message, level) } }
+        return n.captureMessage(message, level)
+    }
 
     @JvmStatic
     @JvmOverloads
@@ -136,7 +158,7 @@ object Blipit {
 
     @JvmStatic
     fun setTag(key: String, value: String) {
-        Core.client?.setTag(key, value)
+        Startup.whenStarted { it.setTag(key, value) }
     }
 
     @JvmStatic
@@ -147,7 +169,7 @@ object Blipit {
     @JvmStatic
     @JvmOverloads
     fun addBreadcrumb(message: String, category: String? = null, level: Level = Level.INFO) {
-        Core.client?.addBreadcrumb(category, message, level, null)
+        Startup.whenStarted { Startup.crumb(it, category, message, level, null) }
     }
 
     @JvmStatic

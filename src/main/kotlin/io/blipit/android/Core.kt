@@ -68,6 +68,7 @@ internal object Core {
             sendCrashNow = false
             contexts.putAll(device(app))
             hook = Config.Hook { event, error ->
+                Startup.attachPrevious(event)
                 Replay.onEvent(event, error)
                 if (event["level"] == "fatal" && (event["tags"] as? Map<*, *>)?.get("mechanism") == "uncaught") CrashMark.write(dir, event["event_id"] as? String)
             }
@@ -76,6 +77,7 @@ internal object Core {
             config.dir = null
             Nuggets(config)
         }
+        Startup.load(config.dir)
         client?.close()
         client = n
         n.installCrashHandler()
@@ -142,7 +144,7 @@ internal object Core {
     }
 
     private fun crumb(category: String, message: String, data: Map<String, Any>? = null, level: Level = Level.INFO) {
-        client?.addBreadcrumb(category, message, level, data)
+        client?.let { Startup.crumb(it, category, message, level, data) }
     }
 
     private fun register(app: Context) {

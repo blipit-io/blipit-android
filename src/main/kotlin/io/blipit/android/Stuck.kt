@@ -20,6 +20,10 @@ import java.util.concurrent.TimeUnit
 
 data class StuckLimits(val startupMs: Long, val flowMs: Long, val exitReasons: Set<String>, val exitImportance: Int) {
     companion object {
+        val FALLBACK = StuckLimits(20_000, 60_000, setOf("low_memory", "excessive_resource_usage", "initialization_failure"), 200)
+
+        fun pick(fresh: StuckLimits?, current: StuckLimits?): StuckLimits = fresh ?: current ?: FALLBACK
+
         fun fromJson(value: Any?): StuckLimits? {
             val map = value as? Map<*, *> ?: return null
             val startup = (map["startup_ms"] as? Number)?.toLong() ?: return null
@@ -197,6 +201,9 @@ internal object Stuck {
     private var ticker: ScheduledFuture<*>? = null
     private var started = 0
     private var fetchTried = 0L
+
+    @Volatile
+    private var provisional = false
     private val pending = ArrayList<Map<String, Any?>>()
 
     fun setup(app: Context, options: BlipitOptions) {
@@ -209,6 +216,7 @@ internal object Stuck {
         environment = options.environment
         val p = app.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
+        HttpFailures.load(p)
         limits = p.getString("limits", null)?.let { runCatching { StuckLimits.fromJson(Json.parse(it)) }.getOrNull() }
         val state = ActivityManager.RunningAppProcessInfo().also { runCatching { ActivityManager.getMyMemoryState(it) } }
         if (state.importance in 1..ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE) visible(+1)
@@ -230,10 +238,10 @@ internal object Stuck {
         io.execute {
             if (limits == null || System.currentTimeMillis() - p.getLong("fetched_at", 0L) > REFRESH_MS) {
                 fetchTried = SystemClock.elapsedRealtime()
-                Blipit.reporter?.stuckSettings()?.let { fresh ->
-                    limits = fresh
-                    p.edit().putString("limits", fresh.toJson()).putLong("fetched_at", System.currentTimeMillis()).apply()
-                }
+                val fresh = Blipit.reporter?.stuckSettings()
+                fresh?.let { p.edit().putString("limits", it.toJson()).putLong("fetched_at", System.currentTimeMillis()).apply() }
+                provisional = fresh == null && limits == null
+                limits = StuckLimits.pick(fresh, limits)
             }
             exits()
             tick()
@@ -272,10 +280,11 @@ internal object Stuck {
 
     private fun tick() {
         val now = SystemClock.elapsedRealtime()
-        if (limits == null && now - fetchTried > 60_000) {
+        if (provisional && now - fetchTried > 60_000) {
             fetchTried = now
             Blipit.reporter?.stuckSettings()?.let { fresh ->
                 limits = fresh
+                provisional = false
                 prefs?.edit()?.putString("limits", fresh.toJson())?.putLong("fetched_at", System.currentTimeMillis())?.apply()
             }
         }
@@ -290,7 +299,9 @@ internal object Stuck {
     }
 
     private fun queue(stuck: Map<String, Any?>) {
-        val body = StuckEvent.build(stuck, trail.snapshot(), release, environment, Build.VERSION.RELEASE ?: "", Build.MODEL)
+        val scope = Core.client?.breadcrumbs().orEmpty()
+        val crumbs = (trail.snapshot() + scope).sortedBy { it["timestamp"] as? String ?: "" }.takeLast(100)
+        val body = StuckEvent.build(stuck, crumbs, release, environment, Build.VERSION.RELEASE ?: "", Build.MODEL)
         synchronized(this) { if (pending.size < 10) pending.add(body) }
     }
 

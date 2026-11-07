@@ -1,3 +1,14 @@
+## 0.7.0
+
+- Failed starts: `Blipit.reportReady(failed = "sessionUnreadable")` on your error screen sends one warning `StartupFailed` with that reason and every breadcrumb of the launch, and ends the startup wait; Blipit groups it by reason. `Blipit.captureStartup(error, step = "auth")` sends the same event for a caught exception with its class, message and cause chain, and the Keystore error code when a cause has one (`auth: GeneralSecurityException caused by KeyStoreException 7`). `reportReady()` without a reason works as before. Same names and event shape as the Swift SDK.
+- Stuck on startup no longer depends on reaching Blipit first: on a first launch without network the check uses 20 s and 60 s until Blipit's own limits arrive, retried every minute. Stuck reports now carry the app's own breadcrumbs as well as the flow steps.
+- Calls made before `init` (`addBreadcrumb`, `setTag`, `captureMessage`, `captureException`, `reportReady(failed)`, `captureStartup`) are kept, up to 100, and applied once `init` runs.
+- Previous launch: breadcrumbs are kept on disk (`no_backup/blipit/breadcrumbs.json`) and the last launch's newest 50 ride on the first event of the next launch as `extra.previous_launch`, labelled "previous launch".
+- Failed requests are reported on their own through `BlipitInterceptor`, one line on the app's `OkHttpClient.Builder()`: `.addInterceptor(BlipitInterceptor())`. When a request ends with an `IOException` (anything but a cancel) or an HTTP 5xx, Blipit sends an error event `HTTPRequestFailed` with the value `<METHOD> <host><path> failed: <status or exception name>`, for example `GET api.example.com/orders/123 failed: 503` or `... failed: SocketTimeoutException`. The event carries the method, the URL without query, user or fragment, the status, the exception, the duration and the breadcrumbs; never headers or bodies. 4xx answers are left out. Requests to Blipit itself are skipped. OkHttp 4 and 5 both work; OkHttp stays the app's own dependency.
+- Every request through the interceptor also leaves an `http` breadcrumb (method, URL without query, status, duration), so crashes and errors show the calls before them. `networkBreadcrumbs = false` turns the breadcrumbs off.
+- One event per method, host and path per minute; repeats are counted into the next event (`extra.http.repeated`). Blipit groups every failure of one endpoint into one issue, with ids and UUIDs in the path folded together.
+- The switch and the pace come from Blipit (the settings answer, like the Stuck limits); on by default. `httpFailures = false` turns it off in the app.
+
 ## 0.6.1
 
 - The report screen no longer sets the status and navigation bar colours with the APIs Android 15 deprecated. On Android 15 and later its navy background fills the area behind the bars; older versions show the system bars in their default colour. Google Play stops warning apps that bundle the SDK about deprecated edge-to-edge APIs.

@@ -261,7 +261,9 @@ class ReportClient(endpoint: String, val key: String) {
     }
 
     fun stuckSettings(): StuckLimits? = try {
-        StuckLimits.fromJson((Json.parse(call("$endpoint/api/v1/feedback/settings", "GET", null, null)) as? Map<*, *>)?.get("stuck"))
+        val json = Json.parse(call("$endpoint/api/v1/feedback/settings", "GET", null, null)) as? Map<*, *>
+        HttpFailures.configure(json?.get("http_failures"))
+        StuckLimits.fromJson(json?.get("stuck"))
     } catch (e: Exception) {
         null
     }

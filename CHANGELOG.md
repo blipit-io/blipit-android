@@ -1,3 +1,7 @@
+## 0.7.2
+
+- Same as 0.7.1, which never built on JitPack (Gradle download timed out); use v0.7.2.
+
 ## 0.7.1
 
 - One `StartupFailed` per launch: after the first `captureStartup` or `reportReady(failed)` of a launch, later calls in the same launch send nothing, so one failed start is one issue instead of one per reason. Call `captureStartup` with the most specific error first (for example the Keystore read), before any general reason.

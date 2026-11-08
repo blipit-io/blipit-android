@@ -34,7 +34,7 @@ class BlipitOptions {
 
 object Blipit {
     const val DEFAULT_ENDPOINT = "https://in.blipit.io"
-    const val VERSION = "0.7.2"
+    const val VERSION = "0.7.3"
     const val SDK_NAME = "blipit-android"
     const val PACKAGE_NAME = "maven:com.github.blipit-io:blipit-android"
 

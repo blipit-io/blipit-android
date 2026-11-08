@@ -1,6 +1,6 @@
-## 0.7.2
+## 0.7.3
 
-- Same as 0.7.1, which never built on JitPack (Gradle download timed out); use v0.7.2.
+- Same as 0.7.1. 0.7.1 and 0.7.2 never built on JitPack because the Gradle download timed out; the wrapper now waits 2 minutes and retries 5 times. Use v0.7.3.
 
 ## 0.7.1
 

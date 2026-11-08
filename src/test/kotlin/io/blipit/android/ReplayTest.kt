@@ -113,6 +113,6 @@ class ReplayTest {
     @Test
     fun replayIsOffUntilConsentEvenAfterInit() {
         assertFalse(Blipit.hasReplayConsent())
-        assertEquals("0.7.2", Blipit.VERSION)
+        assertEquals("0.7.3", Blipit.VERSION)
     }
 }

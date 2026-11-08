@@ -12,6 +12,7 @@ internal object Startup {
     private val early = ArrayList<(Nuggets) -> Unit>()
     private val saver = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "blipit-crumbs").also { it.isDaemon = true } }
     private val saving = AtomicBoolean(false)
+    private val reported = AtomicBoolean(false)
 
     @Volatile
     private var file: File? = null
@@ -76,6 +77,7 @@ internal object Startup {
             early.clear()
             previous = null
         }
+        reported.set(false)
         file = null
     }
 
@@ -96,7 +98,7 @@ internal object Startup {
         return event
     }
 
-    fun failed(n: Nuggets, reason: String): String? = n.send(event(n, reason, mapOf("reason" to reason), null), false)
+    fun failed(n: Nuggets, reason: String): String? = if (!reported.compareAndSet(false, true)) null else n.send(event(n, reason, mapOf("reason" to reason), null), false)
 
     private fun keystore(t: Throwable): Boolean {
         val name = t.javaClass.name
@@ -127,6 +129,7 @@ internal object Startup {
     }
 
     fun capture(n: Nuggets, t: Throwable, step: String): String? {
+        if (!reported.compareAndSet(false, true)) return null
         val (summary, details) = details(t)
         return n.send(event(n, "$step: $summary", details, step), false)
     }

@@ -1,3 +1,7 @@
+## 0.7.1
+
+- One `StartupFailed` per launch: after the first `captureStartup` or `reportReady(failed)` of a launch, later calls in the same launch send nothing, so one failed start is one issue instead of one per reason. Call `captureStartup` with the most specific error first (for example the Keystore read), before any general reason.
+
 ## 0.7.0
 
 - Failed starts: `Blipit.reportReady(failed = "sessionUnreadable")` on your error screen sends one warning `StartupFailed` with that reason and every breadcrumb of the launch, and ends the startup wait; Blipit groups it by reason. `Blipit.captureStartup(error, step = "auth")` sends the same event for a caught exception with its class, message and cause chain, and the Keystore error code when a cause has one (`auth: GeneralSecurityException caused by KeyStoreException 7`). `reportReady()` without a reason works as before. Same names and event shape as the Swift SDK.

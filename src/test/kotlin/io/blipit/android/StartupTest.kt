@@ -65,7 +65,7 @@ class StartupTest {
         Blipit.captureStartup(GeneralSecurityException("decrypt failed", KeyStoreException("key gone", 7)), "auth")
         Blipit.captureStartup(IllegalStateException("no session"), "auth")
         val events = failures()
-        assertEquals(listOf("auth: GeneralSecurityException caused by KeyStoreException 7", "auth: IllegalStateException"), events.map { (it["exception"] as Map<String, Any?>)["value"] })
+        assertEquals(listOf("auth: GeneralSecurityException caused by KeyStoreException 7"), events.map { (it["exception"] as Map<String, Any?>)["value"] })
         val startup = (events[0]["extra"] as Map<String, Any?>)["startup"] as Map<String, Any?>
         assertEquals("java.security.GeneralSecurityException", startup["error_type"])
         assertEquals(7, startup["error_code"])
@@ -73,6 +73,15 @@ class StartupTest {
         assertEquals(7, ((startup["causes"] as List<Map<String, Any?>>)[0])["keystore_code"])
         assertEquals("auth", (events[0]["tags"] as Map<String, Any?>)["startup.step"])
         assertNull((events[0]["exception"] as Map<String, Any?>)["stacktrace"])
+    }
+
+    @Test
+    @Suppress("UNCHECKED_CAST")
+    fun oneStartupFailurePerLaunch() {
+        Core.client = nuggets()
+        Blipit.captureStartup(IllegalStateException("no session"), "auth")
+        Blipit.reportReady(failed = "sessionUnreadable")
+        assertEquals(listOf("auth: IllegalStateException"), failures().map { (it["exception"] as Map<String, Any?>)["value"] })
     }
 
     @Test

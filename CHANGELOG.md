@@ -1,3 +1,7 @@
+## 0.7.4
+
+- Every request to Blipit (events, sessions, replays, bug reports and their uploads) sends `X-Blipit-Sdk: blipit-android/<version>`, so the update card in Blipit always shows the version you run. Needs blipit-java 0.2.2.
+
 ## 0.7.3
 
 - Same as 0.7.1. 0.7.1 and 0.7.2 never built on JitPack because the Gradle download timed out; the wrapper now waits 2 minutes and retries 5 times. Use v0.7.3.

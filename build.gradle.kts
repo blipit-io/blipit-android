@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.blipit"
-version = "0.7.3"
+version = "0.7.4"
 
 android {
     namespace = "io.blipit.android"
@@ -53,7 +53,7 @@ kotlin {
 }
 
 dependencies {
-    api("com.github.blipit-io:blipit-java:v0.2.1")
+    api("com.github.blipit-io:blipit-java:v0.2.2")
     compileOnly("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -68,7 +68,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "io.blipit"
             artifactId = "blipit-android"
-            version = "0.7.3"
+            version = "0.7.4"
             afterEvaluate {
                 from(components["release"])
             }

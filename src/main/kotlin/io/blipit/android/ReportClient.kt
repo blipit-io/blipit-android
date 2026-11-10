@@ -222,6 +222,7 @@ class ReportClient(endpoint: String, val key: String) {
             conn.connectTimeout = 15_000
             conn.readTimeout = 60_000
             conn.setRequestProperty("X-Blipit-Key", key)
+            conn.setRequestProperty("X-Blipit-Sdk", "${Blipit.SDK_NAME}/${Blipit.VERSION}")
             type?.let { conn.setRequestProperty("Content-Type", it) }
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (body != null) {

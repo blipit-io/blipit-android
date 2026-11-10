@@ -104,6 +104,7 @@ class ReportTest {
             assertEquals("widget", post["source"])
             val shot = seen[2]
             assertEquals("blipit_pk_abc", shot.second["x-blipit-key"])
+            assertTrue(seen.all { it.second["x-blipit-sdk"] == "blipit-android/${Blipit.VERSION}" })
             assertEquals("tok", shot.second["x-blipit-upload"])
             assertEquals("image/jpeg", shot.second["content-type"])
             assertEquals(2048, seen[4].third.size)

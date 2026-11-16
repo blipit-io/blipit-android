@@ -22,6 +22,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -71,10 +72,7 @@ class BlipitReportActivity : Activity() {
             insets
         }
         setContentView(root)
-        if (Build.VERSION.SDK_INT >= 35 && !style.dark) {
-            val light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-            window.insetsController?.setSystemBarsAppearance(light, light)
-        }
+        edgeToEdge()
         layoutDirectionFor()
         showChoice()
     }
@@ -82,6 +80,30 @@ class BlipitReportActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         Reporter.closed()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun edgeToEdge() {
+        val light = !style.dark
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS or WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        val scrim = Color.argb(0x66, 0, 0, 0)
+        window.statusBarColor = if (light && Build.VERSION.SDK_INT < 23) scrim else Color.TRANSPARENT
+        window.navigationBarColor = if (light && Build.VERSION.SDK_INT < 26) scrim else Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 29) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false)
+            val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            window.insetsController?.setSystemBarsAppearance(if (light) mask else 0, mask)
+        } else {
+            var flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            if (light && Build.VERSION.SDK_INT >= 23) flags = flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            if (light && Build.VERSION.SDK_INT >= 26) flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            window.decorView.systemUiVisibility = flags
+        }
     }
 
     private fun layoutDirectionFor() {
@@ -119,8 +141,8 @@ class BlipitReportActivity : Activity() {
         val close = barButton(t("close"), Glyph.Kind.CLOSE) { finish() }
         column.addView(close, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val body = vertical()
-        body.gravity = Gravity.CENTER_VERTICAL
-        body.addView(text(t("mHow"), 20f, true), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(16f) })
+        body.gravity = Gravity.TOP
+        body.addView(text(t("mHow"), 20f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(16f); bottomMargin = dpi(16f) })
         body.addView(card(t("mShot"), null, Glyph.Kind.CAMERA) { takeScreenshot() }, cardParams())
         body.addView(card(t("mSkip"), null, Glyph.Kind.TEXT) { showDetails(null) }, cardParams())
         column.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))

@@ -1,6 +1,7 @@
 ## 0.7.5
 
 - The report button, the screenshot prompt and the report screens have a quieter look that follows your app: the background, text and hairline borders come from your theme's `colorSurface` and `colorOnSurface`, light or dark as your theme is, and buttons use your `colorPrimary` (Blipit blue when the theme sets none), adjusted until it reads on the background. Controls have 8 dp corners and a 48 dp touch area, cards 12 dp, one filled button per screen with the others outlined or plain, no gradients or glows, and a visible focus ring for keyboard and switch access. Behaviour, labels and TalkBack descriptions are unchanged.
+- The report screens draw edge to edge: the screen's own background runs under the status and navigation bars, the content is padded by the bar insets, and the bar icons are dark on a light theme and light on a dark one (on Android 5 and 6, and 5 to 7 for the navigation bar, a dim bar keeps the white icons readable). The choice screen sits at the top under Close instead of in the middle.
 
 ## 0.7.4
 

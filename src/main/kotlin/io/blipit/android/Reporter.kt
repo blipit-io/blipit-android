@@ -11,7 +11,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.drawable.GradientDrawable
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -169,6 +168,8 @@ internal object Reporter {
         if (h != null) main.post { h(trigger, crashId) } else show(null, trigger, crashId)
     }
 
+    fun host(): Activity? = current?.get()
+
     fun currentScreen(): String? = current?.get()?.let { ScreenKey.of(it.javaClass.name, named) }
 
     fun screen(name: String) {
@@ -263,24 +264,21 @@ internal object Reporter {
         fun px(v: Float) = (v * density).toInt()
         val lang = ReportLanguage.pick()
         val crash = kind == "crash"
+        val style = ReportStyle.of(activity)
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             tag = PROMPT_TAG
             layoutDirection = if (lang == "ar") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
-            background = GradientDrawable().apply {
-                setColor(ReportTheme.CARD)
-                cornerRadius = 16 * density
-                setStroke(px(1f), Color.argb(26, 255, 255, 255))
-            }
-            elevation = 10 * density
-            setPadding(px(16f), px(14f), px(16f), px(10f))
+            background = style.box(style.surface, 12f, style.line)
+            elevation = 6 * density
+            setPadding(px(16f), px(14f), px(12f), px(6f))
             isClickable = true
         }
         val title = TextView(activity).apply {
             text = ReportLanguage.text(if (crash) "crashAsk" else "shotAsk", lang)
-            setTextColor(Color.WHITE)
+            setTextColor(style.fg)
             textSize = 15f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            typeface = style.medium
             textDirection = View.TEXT_DIRECTION_LOCALE
         }
         val row = LinearLayout(activity).apply {
@@ -289,10 +287,12 @@ internal object Reporter {
         }
         val later = TextView(activity).apply {
             text = ReportLanguage.text("notNow", lang)
-            setTextColor(ReportTheme.MUTED)
-            textSize = 15f
+            setTextColor(style.fg)
+            textSize = 14f
+            typeface = style.medium
             gravity = Gravity.CENTER
-            minHeight = px(44f)
+            minHeight = px(48f)
+            background = style.outline(4f)
             setPadding(px(14f), 0, px(14f), 0)
             isClickable = true
             isFocusable = true
@@ -300,22 +300,19 @@ internal object Reporter {
         }
         val go = TextView(activity).apply {
             text = ReportLanguage.text(if (crash) "tellUs" else "report", lang)
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(style.onPrimary)
+            textSize = 14f
+            typeface = style.medium
             gravity = Gravity.CENTER
-            minHeight = px(44f)
-            setPadding(px(18f), 0, px(18f), 0)
-            background = GradientDrawable().apply {
-                setColor(ReportTheme.BRAND)
-                cornerRadius = 12 * density
-            }
+            minHeight = px(48f)
+            background = style.filled(4f)
+            setPadding(px(16f), 0, px(16f), 0)
             isClickable = true
             isFocusable = true
             setOnClickListener { answer(true) }
         }
         row.addView(later)
-        row.addView(go)
+        row.addView(go, LinearLayout.LayoutParams(-2, -2).apply { marginStart = px(8f) })
         card.addView(title)
         card.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(8f) })
         val params = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM)
@@ -453,22 +450,20 @@ internal object Reporter {
         if (content.findViewWithTag<View>(TAG) != null) return
         button?.get()?.let { (it.parent as? ViewGroup)?.removeView(it) }
         val density = activity.resources.displayMetrics.density
+        val style = ReportStyle.of(activity)
         val label = TextView(activity).apply {
             tag = TAG
             text = ReportLanguage.text("title")
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(style.onPrimary)
+            textSize = 14f
+            typeface = style.medium
             gravity = Gravity.CENTER
             minHeight = (48 * density).toInt()
-            setPadding((18 * density).toInt(), 0, (18 * density).toInt(), 0)
-            background = GradientDrawable().apply {
-                setColor(ReportTheme.BRAND)
-                cornerRadius = 24 * density
-            }
-            elevation = 8 * density
+            background = style.filled(4f)
+            setPadding((14 * density).toInt(), 0, (16 * density).toInt(), 0)
+            elevation = 3 * density
             contentDescription = text
-            val glyph = Glyph(Glyph.Kind.BUG, Color.WHITE, density)
+            val glyph = Glyph(Glyph.Kind.BUG, style.onPrimary, density, 18)
             setCompoundDrawablesRelativeWithIntrinsicBounds(glyph, null, null, null)
             compoundDrawablePadding = (8 * density).toInt()
             setOnClickListener { show(activity) }
@@ -491,13 +486,4 @@ internal object Reporter {
     private const val SETTLE_MS = 700L
     private const val HOLD_MS = 1000L
     private const val SNAPSHOT_SIDE = 480f
-}
-
-internal object ReportTheme {
-    val NAVY = Color.rgb(11, 26, 58)
-    val CARD = Color.rgb(26, 33, 53)
-    val BRAND = Color.rgb(56, 130, 246)
-    val MUTED = Color.rgb(152, 166, 190)
-    val MARK = Color.rgb(255, 59, 48)
-    val DANGER = Color.rgb(255, 122, 110)
 }

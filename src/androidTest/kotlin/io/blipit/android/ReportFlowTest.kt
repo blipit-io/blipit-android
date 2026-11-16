@@ -30,6 +30,7 @@ import org.junit.runner.RunWith
 
 class HostActivity : Activity() {
     override fun onCreate(state: Bundle?) {
+        if (android.os.Build.VERSION.SDK_INT >= 29) setTheme(android.R.style.Theme_DeviceDefault_DayNight)
         super.onCreate(state)
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

@@ -9,7 +9,6 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +21,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -55,6 +55,7 @@ class BlipitReportActivity : Activity() {
     private val crashId by lazy { intent?.getStringExtra(EXTRA_CRASH) }
     private val picker by lazy { intent?.getBooleanExtra(EXTRA_PICKER, false) == true }
     private val main = Handler(Looper.getMainLooper())
+    internal val style by lazy { ReportStyle.of(Reporter.host() ?: this) }
 
     internal fun t(key: String) = ReportLanguage.text(key, lang)
     private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
@@ -63,13 +64,17 @@ class BlipitReportActivity : Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        root.setBackgroundColor(ReportTheme.NAVY)
+        root.setBackgroundColor(style.surface)
         root.setOnApplyWindowInsetsListener { v, insets ->
             val (l, t, r, b) = bars(insets)
             v.setPadding(l, t, r, b)
             insets
         }
         setContentView(root)
+        if (Build.VERSION.SDK_INT >= 35 && !style.dark) {
+            val light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            window.insetsController?.setSystemBarsAppearance(light, light)
+        }
         layoutDirectionFor()
         showChoice()
     }
@@ -110,19 +115,19 @@ class BlipitReportActivity : Activity() {
     internal fun showChoice() {
         stage = "choice"
         val column = vertical()
-        column.setPadding(dpi(20f), dpi(8f), dpi(20f), dpi(20f))
+        column.setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(20f))
         val close = barButton(t("close"), Glyph.Kind.CLOSE) { finish() }
         column.addView(close, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val body = vertical()
         body.gravity = Gravity.CENTER_VERTICAL
-        body.addView(text(t("mHow"), 24f, true), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(22f) })
+        body.addView(text(t("mHow"), 20f, true), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(16f) })
         body.addView(card(t("mShot"), null, Glyph.Kind.CAMERA) { takeScreenshot() }, cardParams())
         body.addView(card(t("mSkip"), null, Glyph.Kind.TEXT) { showDetails(null) }, cardParams())
         column.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         set(column)
     }
 
-    private fun cardParams() = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(14f) }
+    private fun cardParams() = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(10f) }
 
     private fun takeScreenshot() {
         root.visibility = View.INVISIBLE
@@ -143,9 +148,9 @@ class BlipitReportActivity : Activity() {
     private fun showPicker(now: Bitmap, earlier: List<Bitmap>) {
         stage = "picker"
         val column = vertical()
-        column.setPadding(dpi(20f), dpi(8f), dpi(20f), dpi(20f))
+        column.setPadding(dpi(16f), dpi(8f), dpi(16f), dpi(20f))
         column.addView(barButton(t("mBack"), Glyph.Kind.BACK) { showChoice() }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        column.addView(text(t("pickTitle"), 22f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f); bottomMargin = dpi(18f) })
+        column.addView(text(t("pickTitle"), 20f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dpi(8f); bottomMargin = dpi(16f) })
         val row = horizontal()
         val height = dpi(300f)
         (listOf(now to t("pickNow")) + earlier.map { it to t("pickBefore") }).forEach { (bitmap, label) ->
@@ -154,6 +159,8 @@ class BlipitReportActivity : Activity() {
                 contentDescription = label
                 isClickable = true
                 isFocusable = true
+                background = style.ghost()
+                setPadding(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
                 setOnClickListener {
                     image = bitmap
                     shapes.clear()
@@ -164,14 +171,14 @@ class BlipitReportActivity : Activity() {
             item.addView(ImageView(this).apply {
                 setImageBitmap(bitmap)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                background = rounded(ReportTheme.CARD, 12f, Color.argb(40, 255, 255, 255))
+                background = style.box(style.soft, 12f, style.line)
                 clipToOutline = true
             }, LinearLayout.LayoutParams(width, height))
             item.addView(text(label, 14f, false).apply {
-                setTextColor(ReportTheme.MUTED)
+                setTextColor(style.muted)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dpi(8f) })
-            row.addView(item, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dpi(14f) })
+            row.addView(item, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dpi(8f) })
         }
         val scroll = android.widget.HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -188,7 +195,7 @@ class BlipitReportActivity : Activity() {
         val top = horizontal()
         top.setPadding(dpi(4f), dpi(4f), dpi(10f), dpi(4f))
         val zoom = TextView(this).apply {
-            setTextColor(ReportTheme.MUTED)
+            setTextColor(style.muted)
             textSize = 13f
             gravity = Gravity.CENTER
             text = "100%"
@@ -202,10 +209,12 @@ class BlipitReportActivity : Activity() {
         top.addView(iconButton(Glyph.Kind.ZOOM_IN, t("mZoomIn")) { view.zoomBy(1.5f) })
         top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         top.addView(primary(t("mNext")) { showDetails(null) })
+        top.background = edge(true)
         column.addView(top, LinearLayout.LayoutParams(-1, dpi(56f)))
         column.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         val tools = horizontal()
         tools.setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f))
+        tools.background = edge(false)
         val buttons = mutableMapOf<ReportShape.Tool, TextView>()
         fun select(tool: ReportShape.Tool) {
             view.tool = tool
@@ -218,10 +227,10 @@ class BlipitReportActivity : Activity() {
         ).forEach { (tool, label, glyph) ->
             val b = toolButton(label, glyph) { select(tool) }
             buttons[tool] = b
-            tools.addView(b, LinearLayout.LayoutParams(0, dpi(60f), 1f))
+            tools.addView(b, toolParams())
         }
-        tools.addView(toolButton(t("undo"), Glyph.Kind.UNDO) { view.undo() }, LinearLayout.LayoutParams(0, dpi(60f), 1f))
-        tools.addView(toolButton(t("mFit"), Glyph.Kind.FIT) { view.fit() }, LinearLayout.LayoutParams(0, dpi(60f), 1f))
+        tools.addView(toolButton(t("undo"), Glyph.Kind.UNDO) { view.undo() }, toolParams())
+        tools.addView(toolButton(t("mFit"), Glyph.Kind.FIT) { view.fit() }, toolParams())
         select(view.tool)
         column.addView(tools, LinearLayout.LayoutParams(-1, -2))
         set(column)
@@ -240,34 +249,35 @@ class BlipitReportActivity : Activity() {
             gravity = Gravity.TOP or Gravity.START
         }
         val email = field(t("email"), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
-        val line = text("", 14f, false).apply { setTextColor(ReportTheme.MUTED) }
+        val line = text("", 14f, false).apply { setTextColor(style.muted) }
         status = line
         send = primary(t("send")) {
             submit(title.text.toString(), message.text.toString(), email.text.toString(), message) { on ->
                 spinner.visibility = if (on) View.VISIBLE else View.GONE
                 send.isEnabled = !on
-                send.alpha = if (on) 0.6f else 1f
+                send.alpha = if (on) 0.5f else 1f
             }
         }
         top.addView(barButton(t("mBack"), Glyph.Kind.BACK) { if (!busy) { if (image != null) showEditor() else showChoice() } })
         top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        top.addView(spinner, LinearLayout.LayoutParams(dpi(28f), dpi(28f)).apply { marginEnd = dpi(10f) })
+        top.addView(spinner, LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(10f) })
         top.addView(send)
+        top.background = edge(true)
         column.addView(top, LinearLayout.LayoutParams(-1, dpi(56f)))
 
         val form = vertical()
-        form.setPadding(dpi(20f), dpi(8f), dpi(20f), dpi(24f))
-        form.addView(text(t("title"), 22f, true), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(12f) })
+        form.setPadding(dpi(16f), dpi(16f), dpi(16f), dpi(24f))
+        form.addView(text(t("title"), 20f, true), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dpi(16f) })
         flattened()?.let { preview ->
             val thumb = ImageView(this).apply {
                 setImageBitmap(preview)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                background = rounded(ReportTheme.CARD, 12f)
+                background = style.box(style.soft, 12f, style.line)
                 clipToOutline = true
             }
             form.addView(thumb, LinearLayout.LayoutParams(-1, dpi(150f)).apply { bottomMargin = dpi(12f) })
         }
-        notice?.let { form.addView(text(it, 14f, false).apply { setTextColor(ReportTheme.DANGER) }, gap()) }
+        notice?.let { form.addView(text(it, 14f, false).apply { setTextColor(style.danger) }, gap()) }
         form.addView(title, gap())
         form.addView(message, gap())
         form.addView(email, gap())
@@ -328,7 +338,7 @@ class BlipitReportActivity : Activity() {
     private fun show(text: String, error: Boolean) {
         status?.apply {
             this.text = text
-            setTextColor(if (error) ReportTheme.DANGER else ReportTheme.MUTED)
+            setTextColor(if (error) style.danger else style.muted)
             announceForAccessibility(text)
         }
     }
@@ -339,39 +349,47 @@ class BlipitReportActivity : Activity() {
         gravity = Gravity.CENTER_VERTICAL
     }
 
-    private fun rounded(color: Int, radius: Float, stroke: Int? = null) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(radius)
-        stroke?.let { setStroke(dpi(1f), it) }
+    private fun toolParams() = LinearLayout.LayoutParams(0, dpi(56f), 1f).apply { marginStart = dpi(2f); marginEnd = dpi(2f) }
+
+    private fun edge(bottom: Boolean): android.graphics.drawable.Drawable {
+        val strip = android.graphics.drawable.LayerDrawable(arrayOf(ColorDrawable(style.line), ColorDrawable(style.surface)))
+        if (bottom) strip.setLayerInset(1, 0, 0, 0, dpi(1f)) else strip.setLayerInset(1, 0, dpi(1f), 0, 0)
+        return strip
     }
 
     private fun text(value: String, size: Float, bold: Boolean) = TextView(this).apply {
         text = value
         textSize = size
-        setTextColor(Color.WHITE)
-        if (bold) typeface = android.graphics.Typeface.DEFAULT_BOLD
+        setTextColor(style.fg)
+        if (bold) {
+            typeface = style.medium
+            letterSpacing = -0.01f
+        }
     }
 
     private fun barButton(label: String, glyph: Glyph.Kind, action: () -> Unit) = TextView(this).apply {
         text = label
-        textSize = 16f
-        setTextColor(Color.WHITE)
+        textSize = 14f
+        typeface = style.medium
+        setTextColor(style.fg)
         gravity = Gravity.CENTER_VERTICAL
         minHeight = dpi(48f)
-        setPadding(dpi(8f), 0, dpi(12f), 0)
-        setCompoundDrawablesRelativeWithIntrinsicBounds(Glyph(glyph, Color.WHITE, resources.displayMetrics.density, 20), null, null, null)
-        compoundDrawablePadding = dpi(4f)
+        background = style.ghost(4f)
+        setPadding(dpi(10f), 0, dpi(12f), 0)
+        setCompoundDrawablesRelativeWithIntrinsicBounds(Glyph(glyph, style.fg, resources.displayMetrics.density, 18), null, null, null)
+        compoundDrawablePadding = dpi(6f)
         isClickable = true
         isFocusable = true
         setOnClickListener { action() }
     }
 
     private fun iconButton(glyph: Glyph.Kind, label: String, action: () -> Unit) = ImageView(this).apply {
-        setImageDrawable(Glyph(glyph, Color.WHITE, resources.displayMetrics.density))
+        setImageDrawable(Glyph(glyph, style.fg, resources.displayMetrics.density, 18))
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = label
         minimumWidth = dpi(48f)
         minimumHeight = dpi(48f)
+        background = style.ghost(4f)
         isClickable = true
         isFocusable = true
         setOnClickListener { action() }
@@ -380,13 +398,14 @@ class BlipitReportActivity : Activity() {
 
     private fun primary(label: String, action: () -> Unit) = TextView(this).apply {
         text = label
-        textSize = 16f
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        setTextColor(Color.WHITE)
+        textSize = 14f
+        typeface = style.medium
+        setTextColor(style.onPrimary)
         gravity = Gravity.CENTER
-        minHeight = dpi(44f)
-        setPadding(dpi(18f), 0, dpi(18f), 0)
-        background = rounded(ReportTheme.BRAND, 12f)
+        minHeight = dpi(48f)
+        minWidth = dpi(72f)
+        background = style.filled(4f)
+        setPadding(dpi(16f), 0, dpi(16f), 0)
         isClickable = true
         isFocusable = true
         setOnClickListener { action() }
@@ -398,10 +417,9 @@ class BlipitReportActivity : Activity() {
         maxLines = 1
         ellipsize = android.text.TextUtils.TruncateAt.END
         gravity = Gravity.CENTER
-        tag = Glyph(glyph, ReportTheme.MUTED, resources.displayMetrics.density)
+        tag = Glyph(glyph, style.muted, resources.displayMetrics.density, 20)
         setCompoundDrawablesWithIntrinsicBounds(null, tag as Glyph, null, null)
-        compoundDrawablePadding = dpi(4f)
-        setPadding(0, dpi(6f), 0, dpi(4f))
+        compoundDrawablePadding = dpi(2f)
         contentDescription = label
         isClickable = true
         isFocusable = true
@@ -410,24 +428,35 @@ class BlipitReportActivity : Activity() {
     }
 
     private fun styleTool(view: TextView, on: Boolean) {
-        val color = if (on) Color.WHITE else ReportTheme.MUTED
+        val color = if (on) style.fg else style.muted
         view.setTextColor(color)
+        view.typeface = if (on) style.medium else android.graphics.Typeface.DEFAULT
         (view.tag as? Glyph)?.tint(color)
-        view.background = if (on) rounded(ReportTheme.BRAND, 12f) else null
+        view.background = style.control(if (on) style.soft else Color.TRANSPARENT, null, ReportStyle.alpha(style.fg, 0.08f))
+        view.setPadding(0, dpi(6f), 0, dpi(4f))
         view.isSelected = on
     }
 
     private fun card(title: String, sub: String?, glyph: Glyph.Kind, action: () -> Unit) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        background = rounded(ReportTheme.CARD, 16f, Color.argb(26, 255, 255, 255))
-        setPadding(dpi(16f), dpi(16f), dpi(16f), dpi(16f))
+        background = style.control(style.surface, style.line, ReportStyle.alpha(style.fg, 0.08f), 12f)
+        setPadding(dpi(14f), dpi(14f), dpi(14f), dpi(14f))
         minimumHeight = dpi(64f)
-        addView(ImageView(context).apply { setImageDrawable(Glyph(glyph, ReportTheme.BRAND, resources.displayMetrics.density, 26)) }, LinearLayout.LayoutParams(dpi(32f), dpi(32f)).apply { marginEnd = dpi(14f) })
+        addView(ImageView(context).apply {
+            setImageDrawable(Glyph(glyph, style.fg, resources.displayMetrics.density, 18))
+            scaleType = ImageView.ScaleType.CENTER
+            background = style.box(style.soft, 8f)
+        }, LinearLayout.LayoutParams(dpi(36f), dpi(36f)).apply { marginEnd = dpi(12f) })
         val texts = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        texts.addView(text(title, 17f, true))
-        sub?.let { texts.addView(text(it, 13f, false).apply { setTextColor(ReportTheme.MUTED) }) }
+        texts.addView(text(title, 15f, true))
+        sub?.let { texts.addView(text(it, 13f, false).apply { setTextColor(style.muted) }) }
         addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+        addView(ImageView(context).apply {
+            setImageDrawable(Glyph(Glyph.Kind.BACK, style.muted, resources.displayMetrics.density, 16))
+            scaleX = if (lang == "ar") 1f else -1f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dpi(16f), dpi(16f)))
         contentDescription = sub?.let { "$title, $it" } ?: title
         isClickable = true
         isFocusable = true
@@ -438,10 +467,11 @@ class BlipitReportActivity : Activity() {
         this.hint = hint
         inputType = type
         textSize = 16f
-        setTextColor(Color.WHITE)
-        setHintTextColor(ReportTheme.MUTED)
-        background = rounded(ReportTheme.CARD, 12f)
-        setPadding(dpi(14f), dpi(12f), dpi(14f), dpi(12f))
+        setTextColor(style.fg)
+        setHintTextColor(style.muted)
+        highlightColor = ReportStyle.alpha(style.primary, 0.25f)
+        background = style.input()
+        setPadding(dpi(12f), dpi(10f), dpi(12f), dpi(10f))
         minHeight = dpi(48f)
         contentDescription = hint
     }
@@ -495,7 +525,7 @@ internal class EditorView(context: Context, private val bitmap: Bitmap, private 
     private var lastSpan = 0f
 
     init {
-        setBackgroundColor(Color.argb(64, 0, 0, 0))
+        setBackgroundColor((context as? BlipitReportActivity)?.style?.soft ?: Color.argb(64, 0, 0, 0))
         contentDescription = ReportLanguage.text("pen")
     }
 
@@ -631,7 +661,7 @@ internal class EditorView(context: Context, private val bitmap: Bitmap, private 
 
         fun drawShape(canvas: Canvas, shape: ReportShape, width: Float) {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = ReportTheme.MARK
+                color = ReportStyle.MARK
                 style = Paint.Style.STROKE
                 strokeWidth = width
                 strokeCap = Paint.Cap.ROUND

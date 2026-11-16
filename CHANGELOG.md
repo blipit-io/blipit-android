@@ -1,3 +1,7 @@
+## 0.7.5
+
+- The report button, the screenshot prompt and the report screens have a quieter look that follows your app: the background, text and hairline borders come from your theme's `colorSurface` and `colorOnSurface`, light or dark as your theme is, and buttons use your `colorPrimary` (Blipit blue when the theme sets none), adjusted until it reads on the background. Controls have 8 dp corners and a 48 dp touch area, cards 12 dp, one filled button per screen with the others outlined or plain, no gradients or glows, and a visible focus ring for keyboard and switch access. Behaviour, labels and TalkBack descriptions are unchanged.
+
 ## 0.7.4
 
 - Every request to Blipit (events, sessions, replays, bug reports and their uploads) sends `X-Blipit-Sdk: blipit-android/<version>`, so the update card in Blipit always shows the version you run. Needs blipit-java 0.2.2.
